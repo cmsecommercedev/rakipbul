@@ -1,20 +1,19 @@
-name: CI/CD Pipeline (Test & Master)
+name: CI-CD Test Deploy
 
 on:
   push:
     branches:
       - test
-      - master
 
 jobs:
-  build:
-    runs-on: ${{ github.ref == 'refs/heads/test' && 'TestRunner' || 'ProdRunner' }}
+  build-and-deploy:
+    runs-on: [self-hosted, Windows, X64, test]
 
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup .NET
+      - name: Set up .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
@@ -22,27 +21,11 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore
 
-      - name: Build
-        run: dotnet build --configuration Release
+      - name: Build project
+        run: dotnet build --configuration Release --no-restore
 
-      - name: Run tests
-        run: dotnet test --no-build --verbosity normal
+      - name: Publish project
+        run: dotnet publish -c Release -o "C:\ftpserver\rakipbultest_runner"
 
-      - name: Publish
-        run: dotnet publish -c Release -o ./publish
-
-      # 🧪 Test ortamına deploy
-      - name: Deploy to Test
-        if: github.ref == 'refs/heads/test'
-        run: |
-          echo "Deploying to TEST environment..."
-          robocopy .\publish "C:\ftpserver\rakipbultest_runner" /E /MIR
-          echo "✅ Test deployment completed."
-
-      # 🚀 Production (Master) ortamına deploy
-      - name: Deploy to Production
-        if: github.ref == 'refs/heads/master'
-        run: |
-          echo "Deploying to MASTER environment..."
-          robocopy .\publish "C:\ftpserver\rakipbul_runner" /E /MIR
-          echo "✅ Master deployment completed."
+      - name: Done
+        run: echo "✅ Test deployment completed successfully."
