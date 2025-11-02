@@ -26,6 +26,7 @@ jobs:
 
       - name: Run tests
         run: dotnet test --no-build --verbosity normal
+        
+      - name: Publish to IIS folder
+        run: dotnet publish -c Release -o "C:\ftpserver\rakipbultestrunner"
 
-      - name: Publish
-        run: dotnet publish -c Release -o ./publish
