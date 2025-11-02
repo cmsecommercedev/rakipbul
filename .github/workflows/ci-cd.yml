@@ -1,13 +1,14 @@
-name: CI/CD on Test Branch
+name: CI/CD Pipeline (Test & Master)
 
 on:
   push:
     branches:
       - test
+      - master
 
 jobs:
   build:
-    runs-on: windows-latest
+    runs-on: ${{ github.ref == 'refs/heads/test' && 'TestRunner' || 'ProdRunner' }}
 
     steps:
       - name: Checkout code
@@ -27,5 +28,21 @@ jobs:
       - name: Run tests
         run: dotnet test --no-build --verbosity normal
 
-      - name: Publish to IIS folder
-        run: dotnet publish -c Release -o "C:\ftpserver\rakipbultestrunner"
+      - name: Publish
+        run: dotnet publish -c Release -o ./publish
+
+      # 🧪 Test ortamına deploy
+      - name: Deploy to Test
+        if: github.ref == 'refs/heads/test'
+        run: |
+          echo "Deploying to TEST environment..."
+          robocopy .\publish "C:\ftpserver\rakipbultest_runner" /E /MIR
+          echo "✅ Test deployment completed."
+
+      # 🚀 Production (Master) ortamına deploy
+      - name: Deploy to Production
+        if: github.ref == 'refs/heads/master'
+        run: |
+          echo "Deploying to MASTER environment..."
+          robocopy .\publish "C:\ftpserver\rakipbul_runner" /E /MIR
+          echo "✅ Master deployment completed."
