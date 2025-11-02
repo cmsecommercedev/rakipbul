@@ -120,7 +120,7 @@ namespace RakipBul.Controllers.Api // Namespace'i kontrol edin
                 return BadRequest(new { message = "type 'image' veya 'video' olmalıdır." });
             }
 
-            var last24Hours = DateTime.UtcNow.AddHours(-24);
+            var last24Hours = DateTime.UtcNow.AddDays(-240);
 
             IQueryable<Story> query = _context.Stories
                 .AsNoTracking()
