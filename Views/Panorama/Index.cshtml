@@ -1,6 +1,7 @@
 @model PanoramaViewModel
 @{
     ViewBag.Title = "Haftanın Panoraması";
+    Layout = "_AdminLayout";
     var leagues = Model.Leagues as IEnumerable<RakipbulLeagueDto> ?? new List<RakipbulLeagueDto>();
 }
 <h2>Haftanın Panoraması</h2>

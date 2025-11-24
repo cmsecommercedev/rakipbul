@@ -1,5 +1,5 @@
 public class RakipbulAuthResponse
 {
-    public string RefreshToken { get; set; }
-    public string AccessToken { get; set; }
+    public string Refresh { get; set; }
+    public string Access { get; set; }
 }

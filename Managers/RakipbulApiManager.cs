@@ -28,7 +28,7 @@ public class RakipbulApiManager
         var jsonPayload = JsonConvert.SerializeObject(payload);
         var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
 
-        var response = await client.PostAsync(_settings.Endpoint, content);
+        var response = await client.PostAsync(_settings.TokenEndpoint, content);
         response.EnsureSuccessStatusCode();
 
         var json = await response.Content.ReadAsStringAsync();
@@ -45,7 +45,7 @@ public async Task<List<RakipbulLeagueDto>> GetLeaguesAsync()
     {
         // 1) Token al
         var tokenResult = await GetAuthTokenAsync();
-        var accessToken = tokenResult.AccessToken;
+        var accessToken = tokenResult.Access;
 
         client.DefaultRequestHeaders.Accept.Add(
             new MediaTypeWithQualityHeaderValue("application/json"));
@@ -53,7 +53,7 @@ public async Task<List<RakipbulLeagueDto>> GetLeaguesAsync()
         client.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", accessToken);
 
-        var leaguesUrl = $"{_settings.Endpoint}/leagues/"; 
+        var leaguesUrl = $"{_settings.Endpoint}leagues/"; 
         // NOT: Eğer EndpointBase yoksa appsettings’e ekleyeceğiz.
 
         var response = await client.GetAsync(leaguesUrl);
