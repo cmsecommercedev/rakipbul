@@ -63,7 +63,7 @@ public async Task<List<RakipbulLeagueDto>> GetLeaguesAsync()
         var json = await response.Content.ReadAsStringAsync();
 
         // 2) Mapping
-        var leagues = JsonConvert.DeserializeObject<List<RakipbulLeagueDto>>(json);
+        var leagues = JsonConvert.DeserializeObject<List<RakipbulLeagueDto>>(json) ?? new List<RakipbulLeagueDto>();
 
         return leagues;
     }
@@ -88,6 +88,27 @@ public async Task<List<RakipbulSeasonDto>> GetLeagueSeasonsAsync(int leagueId)
         var json = await response.Content.ReadAsStringAsync();
         var seasons = JsonConvert.DeserializeObject<List<RakipbulSeasonDto>>(json) ?? new List<RakipbulSeasonDto>();
         return seasons;
+    }
+}
+
+public async Task<RakipbulSearchResponse> SearchAsync(string term)
+{
+    using (var client = new HttpClient())
+    {
+        var tokenResult = await GetAuthTokenAsync();
+        var accessToken = tokenResult.Access;
+
+        client.DefaultRequestHeaders.Accept.Add(
+            new MediaTypeWithQualityHeaderValue("application/json"));
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var searchUrl = $"{_settings.Endpoint}search/?term={Uri.EscapeDataString(term)}";
+        var response = await client.GetAsync(searchUrl);
+        response.EnsureSuccessStatusCode();
+        var json = await response.Content.ReadAsStringAsync();
+        var result = JsonConvert.DeserializeObject<RakipbulSearchResponse>(json) ?? new RakipbulSearchResponse();
+        return result;
     }
 }
 
