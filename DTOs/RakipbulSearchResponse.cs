@@ -24,7 +24,7 @@ public class RakipbulPlayerDto
     public RakipbulPositionDto Position { get; set; }
     public RakipbulPositionDto Position2 { get; set; }
     public RakipbulPositionDto Position3 { get; set; }
-    public object Team { get; set; }
+    public RakipbulTeamDto Team { get; set; }  // ✔️ object yerine gerçek sınıf
 }
 
 public class RakipbulPositionDto
