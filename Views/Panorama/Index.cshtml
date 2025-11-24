@@ -1,0 +1,58 @@
+@model PanoramaViewModel
+@{
+    ViewBag.Title = "Haftanın Panoraması";
+    var leagues = Model.Leagues as IEnumerable<RakipbulLeagueDto> ?? new List<RakipbulLeagueDto>();
+}
+<h2>Haftanın Panoraması</h2>
+<form asp-action="Index" method="post">
+    <div>
+        <label for="LeagueId">Lig Seçin:</label>
+        <select id="LeagueId" name="LeagueId">
+            <option value="">-- Lig Seçin --</option>
+            @foreach (var league in leagues)
+            {
+                <option value="@league.Id" selected="@(Model.SelectedLeagueId == league.Id)">
+                    @league.Name
+                </option>
+
+            }
+        </select>
+    </div>
+    <div>
+        <label for="Season">Sezon:</label>
+        <input type="text" id="Season" name="Season" value="@Model.SelectedSeason" />
+    </div>
+    <div>
+        <label for="StartDate">Başlangıç Tarihi:</label>
+        <input type="date" id="StartDate" name="StartDate" value="@Model.StartDate?.ToString("yyyy-MM-dd")" />
+    </div>
+    <div>
+        <label for="EndDate">Bitiş Tarihi:</label>
+        <input type="date" id="EndDate" name="EndDate" value="@Model.EndDate?.ToString("yyyy-MM-dd")" />
+    </div>
+    <div>
+        <label for="YoutubeEmbedLink">YouTube Embed Linki:</label>
+        <input type="text" id="YoutubeEmbedLink" name="YoutubeEmbedLink" value="@Model.YoutubeEmbedLink" />
+    </div>
+    <button type="submit">Kaydet</button>
+</form>
+@if (Model.SelectedLeagueId.HasValue)
+{
+    var selectedLeague = leagues.FirstOrDefault(x => x.Id == Model.SelectedLeagueId);
+    if (selectedLeague != null)
+    {
+        <h3>@selectedLeague.Name</h3>
+        <p>Facebook: @selectedLeague.Facebook</p>
+        <p>Twitter: @selectedLeague.Twitter</p>
+        <p>Instagram: @selectedLeague.Instagram</p>
+        <p>Sezon: @selectedLeague.Season?.Fullname</p>
+        <p>Şehir: @selectedLeague.Province?.Name</p>
+    }
+}
+@if (!string.IsNullOrEmpty(Model.YoutubeEmbedLink))
+{
+    <div>
+        <h4>Video:</h4>
+        <iframe width="560" height="315" src="@Model.YoutubeEmbedLink" frameborder="0" allowfullscreen></iframe>
+    </div>
+}

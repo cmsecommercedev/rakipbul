@@ -42,7 +42,10 @@ builder.Services.AddScoped<LeagueManager>();
 
 builder.Services.AddScoped<NotificationManager>();
 builder.Services.AddTransient<DbBackupJob>();
+builder.Services.Configure<RakipbulApiSettings>(
+    builder.Configuration.GetSection("RakipbulApi"));
 
+builder.Services.AddSingleton<RakipbulApiManager>();
 // DbContext
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
