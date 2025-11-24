@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using System.Threading.Tasks;
 using System.Linq;
@@ -31,10 +31,12 @@ namespace Controllers
         {
             var leagues = await _rakipbulApiManager.GetLeaguesAsync();
             List<RakipbulSeasonDto> seasons = new();
-            if (form.LeagueId > 0)
+
+            if (form.LeagueId.HasValue && form.LeagueId.Value > 0)
             {
-                seasons = await _rakipbulApiManager.GetLeagueSeasonsAsync(form.LeagueId);
+                seasons = await _rakipbulApiManager.GetLeagueSeasonsAsync(form.LeagueId.Value);
             }
+
             var model = new PanoramaViewModel
             {
                 Leagues = leagues,
@@ -43,9 +45,38 @@ namespace Controllers
                 SelectedSeason = form.Season,
                 StartDate = form.StartDate,
                 EndDate = form.EndDate,
-                YoutubeEmbedLink = form.YoutubeEmbedLink
+                YoutubeEmbedLink = form.YoutubeEmbedLink,
+                ActiveTab = form.ActiveTab,
+                Title = form.Title,
+                PlayerId = form.PlayerId,
+                PlayerName = form.PlayerName
+
             };
+
+            // ActiveTab == 1 => Panorama kaydet
+            // ActiveTab == 2 => Haftanın Golleri kaydet
+            // Burada sen ayrı kayıt logic’ini yazarsın.
+
             return View(model);
         }
+
+        [HttpGet]
+        public async Task<IActionResult> GetSeasons(int leagueId)
+        {
+            var seasons = await _rakipbulApiManager.GetLeagueSeasonsAsync(leagueId);
+            return Json(seasons);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> SearchPlayers(string term)
+        {
+            if (string.IsNullOrWhiteSpace(term) || term.Length < 3)
+                return Json(new List<RakipbulPlayerDto>());
+
+            var result = await _rakipbulApiManager.SearchAsync(term);
+            return Json(result.Player); // SearchResponse içinde Players olduğunu varsayıyoruz
+        }
+
+
     }
 }
