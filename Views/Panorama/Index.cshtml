@@ -48,9 +48,10 @@
 
 
 <div class="max-w-5xl mx-auto py-8">
-    <h2 class="text-3xl font-extrabold mb-6 text-center tracking-tight text-gray-800">
-        Haftanın İçerikleri
-    </h2>
+    <input type="hidden" name="TeamName" x-model="selectedTeamName" />
+    <input type="hidden" name="LeagueName" x-model="selectedLeagueName" />
+    <input type="hidden" name="ProvinceName" x-model="selectedProvinceName" />
+
 
     <!-- TAB HEADER -->
     <div class="flex justify-center mb-6">
@@ -172,16 +173,51 @@
                     <template x-for="p in results" :key="p.id">
                         <div @@click ="selectPlayer(p)"
                              class="flex items-center gap-3 px-3 py-2 hover:bg-gray-100 cursor-pointer transition">
+
+                            <!-- Oyuncu foto -->
                             <img :src="p.image_Url"
-                                 class="w-10 h-10 rounded-full object-cover border" />
+                                 class="w-12 h-12 rounded-full object-cover border shadow-sm" />
 
+                            <div class="flex-1">
 
-                            <div>
-                                <div class="font-semibold text-gray-800" x-text="p.fullname"></div>
-                                <div class="text-xs text-gray-500" x-text="'#' + p.number"></div>
+                                <!-- Oyuncu ad + numara -->
+                                <div class="flex items-center justify-between">
+                                    <div class="font-semibold text-gray-800" x-text="p.fullname"></div>
+                                    <div class="text-xs text-gray-500 font-medium" x-text="'#' + p.number"></div>
+                                </div>
+
+                                <!-- Pozisyon -->
+                                <div class="text-xs text-gray-500"
+                                     x-text="p.position?.name ?? 'Pozisyon yok'">
+                                </div>
+
+                                <!-- Takım Bilgisi -->
+                                <template x-if="p.team">
+                                    <div class="flex items-center gap-2 mt-1">
+
+                                        <!-- Takım logo -->
+                                        <img :src="p.team.image_Url"
+                                             class="w-6 h-6 rounded-full object-cover border" />
+
+                                        <div class="text-xs text-gray-700">
+                                            <span class="font-medium" x-text="p.team.name"></span>
+
+                                            <!-- Lig + Şehir -->
+                                            <template x-if="p.team.league">
+                                                <span class="text-gray-500">
+                                                    • <span x-text="p.team.league.name"></span>,
+                                                    <span x-text="p.team.league.province?.name"></span>
+                                                </span>
+                                            </template>
+                                        </div>
+
+                                    </div>
+                                </template>
+
                             </div>
                         </div>
                     </template>
+
 
                     <div x-show="loading" class="px-3 py-2 text-sm text-gray-500">
                         Aranıyor...
@@ -357,16 +393,51 @@
                     <template x-for="p in results" :key="p.id">
                         <div @@click ="selectPlayer(p)"
                              class="flex items-center gap-3 px-3 py-2 hover:bg-gray-100 cursor-pointer transition">
+
+                            <!-- Oyuncu foto -->
                             <img :src="p.image_Url"
-                                 class="w-10 h-10 rounded-full object-cover border" />
+                                 class="w-12 h-12 rounded-full object-cover border shadow-sm" />
 
+                            <div class="flex-1">
 
-                            <div>
-                                <div class="font-semibold text-gray-800" x-text="p.fullname"></div>
-                                <div class="text-xs text-gray-500" x-text="'#' + p.number"></div>
+                                <!-- Oyuncu ad + numara -->
+                                <div class="flex items-center justify-between">
+                                    <div class="font-semibold text-gray-800" x-text="p.fullname"></div>
+                                    <div class="text-xs text-gray-500 font-medium" x-text="'#' + p.number"></div>
+                                </div>
+
+                                <!-- Pozisyon -->
+                                <div class="text-xs text-gray-500"
+                                     x-text="p.position?.name ?? 'Pozisyon yok'">
+                                </div>
+
+                                <!-- Takım Bilgisi -->
+                                <template x-if="p.team">
+                                    <div class="flex items-center gap-2 mt-1">
+
+                                        <!-- Takım logo -->
+                                        <img :src="p.team.image_Url"
+                                             class="w-6 h-6 rounded-full object-cover border" />
+
+                                        <div class="text-xs text-gray-700">
+                                            <span class="font-medium" x-text="p.team.name"></span>
+
+                                            <!-- Lig + Şehir -->
+                                            <template x-if="p.team.league">
+                                                <span class="text-gray-500">
+                                                    • <span x-text="p.team.league.name"></span>,
+                                                    <span x-text="p.team.league.province?.name"></span>
+                                                </span>
+                                            </template>
+                                        </div>
+
+                                    </div>
+                                </template>
+
                             </div>
                         </div>
                     </template>
+
 
                     <div x-show="loading" class="px-3 py-2 text-sm text-gray-500">
                         Aranıyor...
@@ -534,11 +605,17 @@
                     });
             },
 
-            selectPlayer(p) {
-                this.query = p.fullname;
-                this.selectedPlayerId = p.id;
-                this.open = false;
-            }
+               selectPlayer(p) {
+        this.query = p.fullname;
+        this.selectedPlayerId = p.id;
+
+        this.selectedTeamName = p.team?.name ?? "";
+        this.selectedLeagueName = p.team?.league?.name ?? "";
+        this.selectedProvinceName = p.team?.league?.province?.name ?? "";
+
+        this.open = false;
+    }
+
         }
     }
 </script>
