@@ -69,4 +69,26 @@ public async Task<List<RakipbulLeagueDto>> GetLeaguesAsync()
     }
 }
 
+public async Task<List<RakipbulSeasonDto>> GetLeagueSeasonsAsync(int leagueId)
+{
+    using (var client = new HttpClient())
+    {
+        // 1) Token al
+        var tokenResult = await GetAuthTokenAsync();
+        var accessToken = tokenResult.Access;
+
+        client.DefaultRequestHeaders.Accept.Add(
+            new MediaTypeWithQualityHeaderValue("application/json"));
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var seasonsUrl = $"{_settings.Endpoint}leagues/{leagueId}/seasons/";
+        var response = await client.GetAsync(seasonsUrl);
+        response.EnsureSuccessStatusCode();
+        var json = await response.Content.ReadAsStringAsync();
+        var seasons = JsonConvert.DeserializeObject<List<RakipbulSeasonDto>>(json) ?? new List<RakipbulSeasonDto>();
+        return seasons;
+    }
+}
+
 }

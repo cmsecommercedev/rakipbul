@@ -11,6 +11,7 @@ public class PanoramaViewModel
     public string? YoutubeEmbedLink { get; set; }
     public string? LeagueName { get; set; }
     public string? LeagueDetails { get; set; }
+    public List<RakipbulSeasonDto>? Seasons { get; set; }
 }
 
 public class PanoramaFormModel

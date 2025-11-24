@@ -3,57 +3,86 @@
     ViewBag.Title = "Haftanın Panoraması";
     Layout = "_AdminLayout";
     var leagues = Model.Leagues as IEnumerable<RakipbulLeagueDto> ?? new List<RakipbulLeagueDto>();
+    var seasons = Model.Seasons as IEnumerable<RakipbulSeasonDto> ?? new List<RakipbulSeasonDto>();
 }
-<h2>Haftanın Panoraması</h2>
-<form asp-action="Index" method="post">
+<h2 class="text-2xl font-bold mb-6 text-center">Haftanın Panoraması</h2>
+<form asp-action="Index" method="post" class="max-w-xl mx-auto bg-white p-6 rounded-lg shadow-md space-y-4">
     <div>
-        <label for="LeagueId">Lig Seçin:</label>
-        <select id="LeagueId" name="LeagueId">
+        <label for="LeagueId" class="block text-sm font-medium text-gray-700 mb-1">Lig Seçin:</label>
+        <select id="LeagueId" name="LeagueId" class="w-full border rounded px-3 py-2 focus:outline-none focus:ring focus:border-blue-300">
             <option value="">-- Lig Seçin --</option>
             @foreach (var league in leagues)
             {
-                <option value="@league.Id" selected="@(Model.SelectedLeagueId == league.Id)">
-                    @league.Name
-                </option>
-
+                if (Model.SelectedLeagueId == league.Id)
+                {
+                    <option value="@league.Id" selected>@league.Name</option>
+                }
+                else
+                {
+                    <option value="@league.Id">@league.Name</option>
+                }
             }
         </select>
     </div>
-    <div>
-        <label for="Season">Sezon:</label>
-        <input type="text" id="Season" name="Season" value="@Model.SelectedSeason" />
+    @if (seasons.Any())
+    {
+        <div>
+            <label for="Season" class="block text-sm font-medium text-gray-700 mb-1">Sezon Seçin:</label>
+            <select id="Season" name="Season" class="w-full border rounded px-3 py-2 focus:outline-none focus:ring focus:border-blue-300">
+                <option value="">-- Sezon Seçin --</option>
+                @foreach (var season in seasons)
+                {
+                    if (Model.SelectedSeason == season.Fullname)
+                    {
+                        <option value="@season.Fullname" selected>@season.Fullname (@season.Year)</option>
+                    }
+                    else
+                    {
+                        <option value="@season.Fullname">@season.Fullname (@season.Year)</option>
+                    }
+                }
+            </select>
+        </div>
+    }
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+            <label for="StartDate" class="block text-sm font-medium text-gray-700 mb-1">Başlangıç Tarihi:</label>
+            <input type="date" id="StartDate" name="StartDate" value="@Model.StartDate?.ToString("yyyy-MM-dd")" class="w-full border rounded px-3 py-2 focus:outline-none focus:ring focus:border-blue-300" />
+        </div>
+        <div>
+            <label for="EndDate" class="block text-sm font-medium text-gray-700 mb-1">Bitiş Tarihi:</label>
+            <input type="date" id="EndDate" name="EndDate" value="@Model.EndDate?.ToString("yyyy-MM-dd")" class="w-full border rounded px-3 py-2 focus:outline-none focus:ring focus:border-blue-300" />
+        </div>
     </div>
     <div>
-        <label for="StartDate">Başlangıç Tarihi:</label>
-        <input type="date" id="StartDate" name="StartDate" value="@Model.StartDate?.ToString("yyyy-MM-dd")" />
+        <label for="YoutubeEmbedLink" class="block text-sm font-medium text-gray-700 mb-1">YouTube Embed Linki:</label>
+        <input type="text" id="YoutubeEmbedLink" name="YoutubeEmbedLink" value="@Model.YoutubeEmbedLink" class="w-full border rounded px-3 py-2 focus:outline-none focus:ring focus:border-blue-300" />
     </div>
-    <div>
-        <label for="EndDate">Bitiş Tarihi:</label>
-        <input type="date" id="EndDate" name="EndDate" value="@Model.EndDate?.ToString("yyyy-MM-dd")" />
-    </div>
-    <div>
-        <label for="YoutubeEmbedLink">YouTube Embed Linki:</label>
-        <input type="text" id="YoutubeEmbedLink" name="YoutubeEmbedLink" value="@Model.YoutubeEmbedLink" />
-    </div>
-    <button type="submit">Kaydet</button>
+    <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition">Kaydet</button>
 </form>
 @if (Model.SelectedLeagueId.HasValue)
 {
     var selectedLeague = leagues.FirstOrDefault(x => x.Id == Model.SelectedLeagueId);
     if (selectedLeague != null)
     {
-        <h3>@selectedLeague.Name</h3>
-        <p>Facebook: @selectedLeague.Facebook</p>
-        <p>Twitter: @selectedLeague.Twitter</p>
-        <p>Instagram: @selectedLeague.Instagram</p>
-        <p>Sezon: @selectedLeague.Season?.Fullname</p>
-        <p>Şehir: @selectedLeague.Province?.Name</p>
+        <div class="max-w-xl mx-auto mt-8 bg-gray-50 p-4 rounded shadow">
+            <h3 class="text-lg font-semibold mb-2">@selectedLeague.Name</h3>
+            <div class="flex flex-wrap gap-4">
+                <span class="text-sm">Facebook: <a href="@selectedLeague.Facebook" class="text-blue-500" target="_blank">@selectedLeague.Facebook</a></span>
+                <span class="text-sm">Twitter: <a href="@selectedLeague.Twitter" class="text-blue-500" target="_blank">@selectedLeague.Twitter</a></span>
+                <span class="text-sm">Instagram: <a href="@selectedLeague.Instagram" class="text-blue-500" target="_blank">@selectedLeague.Instagram</a></span>
+            </div>
+            <div class="mt-2 text-sm text-gray-700">Sezon: @selectedLeague.Season?.Fullname</div>
+            <div class="mt-1 text-sm text-gray-700">Şehir: @selectedLeague.Province?.Name</div>
+        </div>
     }
 }
 @if (!string.IsNullOrEmpty(Model.YoutubeEmbedLink))
 {
-    <div>
-        <h4>Video:</h4>
-        <iframe width="560" height="315" src="@Model.YoutubeEmbedLink" frameborder="0" allowfullscreen></iframe>
+    <div class="max-w-xl mx-auto mt-8">
+        <h4 class="text-base font-semibold mb-2">Video:</h4>
+        <div class="aspect-w-16 aspect-h-9">
+            <iframe class="w-full h-64 rounded" src="@Model.YoutubeEmbedLink" frameborder="0" allowfullscreen></iframe>
+        </div>
     </div>
 }
