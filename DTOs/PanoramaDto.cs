@@ -1,0 +1,29 @@
+namespace RakipBul.Models.Dtos
+{
+    public class PanoramaDto
+    {
+        public int Id { get; set; }
+        public string Title { get; set; }
+        public DateTime? StartDate { get; set; }
+        public DateTime? EndDate { get; set; }
+        public string? YoutubeEmbedLink { get; set; }
+
+        // Player Info
+        public int? PlayerId { get; set; }
+        public string? PlayerName { get; set; }
+        public string? PlayerImageUrl { get; set; }
+        public string? PlayerPosition { get; set; }
+
+        // Team Info
+        public int? TeamId { get; set; }
+        public string? TeamName { get; set; }
+        public string? TeamImageUrl { get; set; }
+
+        // League Info
+        public int? LeagueId { get; set; }
+        public string? LeagueName { get; set; }
+        public string? ProvinceName { get; set; }
+
+        public DateTime CreatedAt { get; set; }
+    }
+}

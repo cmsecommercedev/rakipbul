@@ -15,6 +15,7 @@
             opacity: 0;
             transform: translateY(8px);
         }
+
         100% {
             opacity: 1;
             transform: translateY(0);
@@ -31,26 +32,24 @@
     }
 
     @@keyframes fadeIn {
-        from
+        from {
+            opacity: 0;
+            transform: translateY(4px);
+        }
 
-    {
-        opacity: 0;
-        transform: translateY(4px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
     }
 </style>
 
 
 <div class="max-w-5xl mx-auto py-8">
-    <input type="hidden" name="TeamName" x-model="selectedTeamName" />
-    <input type="hidden" name="LeagueName" x-model="selectedLeagueName" />
-    <input type="hidden" name="ProvinceName" x-model="selectedProvinceName" />
+
+
+    <input type="hidden" name="PlayerId" x-model="selectedPlayerId" />
+
 
 
     <!-- TAB HEADER -->
@@ -78,8 +77,14 @@
     <div id="tab-panorama"
          class="tab-panel @(activeTab == 1 ? "tab-panel-active" : "hidden")">
 
-        <form asp-action="Index" method="post"
+        <form asp-action="Index" method="post" x-data="playerSearchComponent()" 
               class="max-w-xl mx-auto bg-white p-6 rounded-2xl shadow-lg space-y-5 border border-gray-100">
+            <input type="hidden" name="TeamName" x-model="selectedTeamName" />
+            <input type="hidden" name="LeagueName" x-model="selectedLeagueName" />
+            <input type="hidden" name="ProvinceName" x-model="selectedProvinceName" />   
+            <input type="hidden" name="PlayerId" x-model="selectedPlayerId" />
+            <input type="hidden" name="PlayerName" x-model="selectedPlayerName" />
+            <input type="hidden" name="PlayerJson" x-model="selectedPlayerJson" />
             <input type="hidden" name="ActiveTab" value="1" />
 
             <h3 class="text-xl font-bold mb-2 text-gray-800 flex items-center gap-2">
@@ -116,7 +121,7 @@
                 <label for="Season" class="block text-sm font-medium text-gray-700 mb-1">
                     Sezon Seçin
                 </label>
-                <select id="Season" name="Season"
+                <select id="SeasonId" name="SeasonId"
                         class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm md:text-base
                                focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400
                                transition">
@@ -125,11 +130,15 @@
                     {
                         if (Model.SelectedSeason == season.Fullname)
                         {
-                            <option value="@season.Fullname" selected>@season.Fullname (@season.Year)</option>
+                            <option value="@season.Id">
+                                @season.Fullname (@season.Year)
+                            </option>
                         }
                         else
                         {
-                            <option value="@season.Fullname">@season.Fullname (@season.Year)</option>
+                            <option value="@season.Id">
+                                @season.Fullname (@season.Year)
+                            </option>
                         }
                     }
                 </select>
@@ -147,204 +156,90 @@
                   focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400
                   transition" />
             </div>
-            <div x-data="playerSearchComponent()" class="relative">
+
+            <div class="relative">
                 <label class="block text-sm font-medium text-gray-700 mb-1">
-                    Golü Atan Oyuncu
+                    Oyuncu Ara
                 </label>
-
-                <!-- Hidden gerçek PlayerId -->
-                <input type="hidden" name="PlayerId" x-model="selectedPlayerId" />
-
-                <!-- Text input (autocomplete) -->
+                <!-- Oyuncu Arama Input -->
                 <input type="text"
-                       name="PlayerName"
                        x-model="query"
-                       @@input ="onInput"
+                       @@input="onInput"
                        placeholder="Oyuncu ara (3 harf ve üzeri)..."
-                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm md:text-base
-                  focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400
-                  transition" />
+                       class="w-full border border-gray-300 rounded-lg px-3 py-2" />
 
-                <!-- Suggestions list -->
-                <div x-show="open"
-                     @@click.away ="open = false"
-                     class="absolute z-50 w-full bg-white border border-gray-200 rounded-lg shadow-lg mt-1 max-h-60 overflow-auto animate-fadeIn">
+                <!-- Loading Spinner -->
+                <div x-show="loading" class="flex justify-center py-4">
+                    <div class="w-6 h-6 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                </div>
+
+                <!-- Result Grid -->
+                <div x-show="open && results.length > 0"
+                     @@click.away="open = false"
+                     class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mt-3">
 
                     <template x-for="p in results" :key="p.id">
-                        <div @@click ="selectPlayer(p)"
-                             class="flex items-center gap-3 px-3 py-2 hover:bg-gray-100 cursor-pointer transition">
 
-                            <!-- Oyuncu foto -->
-                            <img :src="p.image_Url"
-                                 class="w-12 h-12 rounded-full object-cover border shadow-sm" />
+                        <div @@click="selectPlayer(p)"
+                             class="bg-white border rounded-xl shadow-sm p-4
+                        cursor-pointer hover:shadow-md hover:scale-[1.02]
+                        transition flex flex-col items-center text-center relative">
 
-                            <div class="flex-1">
+                            <!-- Foto -->
+                            <img :src="p.image_Url || '/images/default-player.png'"
+                                 class="w-20 h-20 rounded-full border mb-3" />
 
-                                <!-- Oyuncu ad + numara -->
-                                <div class="flex items-center justify-between">
-                                    <div class="font-semibold text-gray-800" x-text="p.fullname"></div>
-                                    <div class="text-xs text-gray-500 font-medium" x-text="'#' + p.number"></div>
-                                </div>
-
-                                <!-- Pozisyon -->
-                                <div class="text-xs text-gray-500"
-                                     x-text="p.position?.name ?? 'Pozisyon yok'">
-                                </div>
-
-                                <!-- Takım Bilgisi -->
-                                <template x-if="p.team">
-                                    <div class="flex items-center gap-2 mt-1">
-
-                                        <!-- Takım logo -->
-                                        <img :src="p.team.image_Url"
-                                             class="w-6 h-6 rounded-full object-cover border" />
-
-                                        <div class="text-xs text-gray-700">
-                                            <span class="font-medium" x-text="p.team.name"></span>
-
-                                            <!-- Lig + Şehir -->
-                                            <template x-if="p.team.league">
-                                                <span class="text-gray-500">
-                                                    • <span x-text="p.team.league.name"></span>,
-                                                    <span x-text="p.team.league.province?.name"></span>
-                                                </span>
-                                            </template>
-                                        </div>
-
-                                    </div>
-                                </template>
-
+                            <!-- Numara -->
+                            <div class="absolute top-2 right-2 bg-gray-900 text-white
+                            text-xs px-2 py-1 rounded-full">
+                                #<span x-text="p.number || '-'"></span>
                             </div>
+
+                            <!-- İsim -->
+                            <div class="font-semibold text-gray-800 text-sm" x-text="p.fullname"></div>
+
+                            <!-- Pozisyon -->
+                            <div class="text-xs text-gray-500 mb-1"
+                                 x-text="p.position?.name ?? 'Pozisyon'"></div>
+
+                            <!-- Takım -->
+                            <div class="flex items-center gap-2 mb-2">
+                                <img :src="p.team?.image_Url || '/images/default_team.png'"
+                                     class="w-6 h-6 rounded-full border" />
+                                <span class="text-xs" x-text="p.team?.name ?? 'Takım Yok'"></span>
+                            </div>
+
+                            <!-- Lig -->
+                            <span class="text-[10px] px-2 py-0.5 rounded-full text-white"
+                                  :class="leagueColor(p.team?.league?.name)"
+                                  x-text="p.team?.league?.name">
+                            </span>
                         </div>
                     </template>
 
-
-                    <div x-show="loading" class="px-3 py-2 text-sm text-gray-500">
-                        Aranıyor...
-                    </div>
                 </div>
+
             </div>
 
+            <!-- Tarihler --> <div class="grid grid-cols-1 md:grid-cols-2 gap-4"> <div> <label for="StartDate" class="block text-sm font-medium text-gray-700 mb-1"> Başlangıç Tarihi </label> <input type="date" id="StartDate" name="StartDate" value="@Model.StartDate?.ToString("yyyy-MM-dd")" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm md:text-base focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition" /> </div> <div> <label for="EndDate" class="block text-sm font-medium text-gray-700 mb-1"> Bitiş Tarihi </label> <input type="date" id="EndDate" name="EndDate" value="@Model.EndDate?.ToString("yyyy-MM-dd")" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm md:text-base focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition" /> </div> </div> <!-- Youtube --> <div> <label for="YoutubeEmbedLink" class="block text-sm font-medium text-gray-700 mb-1"> YouTube Embed Linki </label> <input type="text" id="YoutubeEmbedLink" name="YoutubeEmbedLink" value="@Model.YoutubeEmbedLink" placeholder="https://www.youtube.com/embed/..." class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm md:text-base focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition" /> <p class="text-xs text-gray-400 mt-1"> Direkt <code>/embed/</code> formatında link vermeniz önerilir. </p> </div> <button type="submit" class="w-full bg-blue-600 text-white py-2.5 rounded-xl font-semibold hover:bg-blue-700 active:scale-[0.98] transition-transform transition-colors duration-200 shadow"> Panoramayı Kaydet </button>
 
-            <!-- Tarihler -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <label for="StartDate" class="block text-sm font-medium text-gray-700 mb-1">
-                        Başlangıç Tarihi
-                    </label>
-                    <input type="date" id="StartDate" name="StartDate"
-                           value="@Model.StartDate?.ToString("yyyy-MM-dd")"
-                           class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm md:text-base
-                                  focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400
-                                  transition" />
-                </div>
-                <div>
-                    <label for="EndDate" class="block text-sm font-medium text-gray-700 mb-1">
-                        Bitiş Tarihi
-                    </label>
-                    <input type="date" id="EndDate" name="EndDate"
-                           value="@Model.EndDate?.ToString("yyyy-MM-dd")"
-                           class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm md:text-base
-                                  focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400
-                                  transition" />
-                </div>
-            </div>
 
-            <!-- Youtube -->
-            <div>
-                <label for="YoutubeEmbedLink" class="block text-sm font-medium text-gray-700 mb-1">
-                    YouTube Embed Linki
-                </label>
-                <input type="text" id="YoutubeEmbedLink" name="YoutubeEmbedLink"
-                       value="@Model.YoutubeEmbedLink"
-                       placeholder="https://www.youtube.com/embed/..."
-                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm md:text-base
-                              focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400
-                              transition" />
-                <p class="text-xs text-gray-400 mt-1">
-                    Direkt <code>/embed/</code> formatında link vermeniz önerilir.
-                </p>
-            </div>
-
-            <button type="submit"
-                    class="w-full bg-blue-600 text-white py-2.5 rounded-xl font-semibold
-                           hover:bg-blue-700 active:scale-[0.98]
-                           transition-transform transition-colors duration-200 shadow">
-                Panoramayı Kaydet
-            </button>
         </form>
 
-        <!-- Lig detayları + video -->
-        @if (Model.SelectedLeagueId.HasValue)
-        {
-            var selectedLeague = leagues.FirstOrDefault(x => x.Id == Model.SelectedLeagueId);
-            if (selectedLeague != null)
-            {
-                <div class="max-w-xl mx-auto mt-6 bg-gray-50 p-4 rounded-xl shadow-sm border border-gray-100">
-                    <h3 class="text-lg font-semibold mb-2 text-gray-800 flex items-center gap-2">
-                        <span class="inline-block w-1 h-6 bg-blue-500 rounded-full"></span>
-                        @selectedLeague.Name
-                    </h3>
-
-                    <div class="flex flex-wrap gap-3 text-sm">
-                        @if (!string.IsNullOrEmpty(selectedLeague.Facebook))
-                        {
-                            <span>
-                                Facebook:
-                                <a href="@selectedLeague.Facebook" class="text-blue-600 hover:underline" target="_blank">
-                                    @selectedLeague.Facebook
-                                </a>
-                            </span>
-                        }
-                        @if (!string.IsNullOrEmpty(selectedLeague.Twitter))
-                        {
-                            <span>
-                                Twitter:
-                                <a href="@selectedLeague.Twitter" class="text-blue-600 hover:underline" target="_blank">
-                                    @selectedLeague.Twitter
-                                </a>
-                            </span>
-                        }
-                        @if (!string.IsNullOrEmpty(selectedLeague.Instagram))
-                        {
-                            <span>
-                                Instagram:
-                                <a href="@selectedLeague.Instagram" class="text-pink-600 hover:underline" target="_blank">
-                                    @selectedLeague.Instagram
-                                </a>
-                            </span>
-                        }
-                    </div>
-
-                    <div class="mt-2 text-sm text-gray-700">
-                        <div>Sezon: @selectedLeague.Season?.Fullname</div>
-                        <div>Şehir: @selectedLeague.Province?.Name</div>
-                    </div>
-                </div>
-            }
-        }
-
-        @if (!string.IsNullOrEmpty(Model.YoutubeEmbedLink))
-        {
-            <div class="max-w-xl mx-auto mt-6">
-                <h4 class="text-base font-semibold mb-2 text-gray-800">Panorama Videosu</h4>
-                <div class="relative w-full overflow-hidden rounded-xl shadow-lg" style="padding-top: 56.25%;">
-                    <iframe class="absolute inset-0 w-full h-full"
-                            src="@Model.YoutubeEmbedLink"
-                            frameborder="0"
-                            allowfullscreen>
-                    </iframe>
-                </div>
-            </div>
-        }
     </div>
 
     <!-- TAB HAFTANIN GOLLERI -->
-    <div id="tab-goals"
-         class="tab-panel @(activeTab == 2 ? "tab-panel-active" : "hidden")">
-
-        <form asp-action="Index" method="post"
+    <div id="tab-goals" class="tab-panel @(activeTab == 2 ? "tab-panel-active" : "hidden")">
+     
+        <form asp-action="Index" method="post" x-data="playerSearchComponent()"
               class="max-w-xl mx-auto bg-white p-6 rounded-2xl shadow-lg space-y-5 border border-gray-100">
+
+            <input type="hidden" name="TeamName" x-model="selectedTeamName" />
+            <input type="hidden" name="LeagueName" x-model="selectedLeagueName" />
+            <input type="hidden" name="ProvinceName" x-model="selectedProvinceName" />
+            <input type="hidden" name="PlayerId" x-model="selectedPlayerId" />
+            <input type="hidden" name="PlayerName" x-model="selectedPlayerName" />
+            <input type="hidden" name="PlayerJson" x-model="selectedPlayerJson" />
             <input type="hidden" name="ActiveTab" value="2" />
 
             <h3 class="text-xl font-bold mb-2 text-gray-800 flex items-center gap-2">
@@ -355,6 +250,62 @@
             <p class="text-sm text-gray-500 mb-3">
                 Bu bölümden haftanın en güzel gollerine ait video veya playlist embed linkini kaydedebilirsiniz.
             </p>
+
+            <!-- Lig -->
+            <div class="space-y-1">
+                <label for="LeagueId" class="block text-sm font-medium text-gray-700 mb-1">
+                    Lig Seçin
+                </label>
+                <select id="LeagueId" name="LeagueId"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm md:text-base
+                               focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400
+                               transition">
+                    <option value="">-- Lig Seçin --</option>
+                    @foreach (var league in leagues)
+                    {
+                        if (Model.SelectedLeagueId == league.Id)
+                        {
+                            <option value="@league.Id" selected>@league.Name</option>
+                        }
+                        else
+                        {
+                            <option value="@league.Id">@league.Name</option>
+                        }
+                    }
+                </select>
+            </div>
+
+            <!-- Sezon -->
+            <div class="space-y-1">
+                <label for="Season" class="block text-sm font-medium text-gray-700 mb-1">
+                    Sezon Seçin
+                </label>
+                <select id="SeasonId" name="SeasonId"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm md:text-base
+                               focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400
+                               transition">
+                    <option value="">-- Sezon Seçin --</option>
+                    @foreach (var season in seasons)
+                    {
+                        if (Model.SelectedSeason == season.Fullname)
+                        {
+                            <option value="@season.Id">
+                                @season.Fullname (@season.Year)
+                            </option>
+                        }
+                        else
+                        {
+                            <option value="@season.Id">
+                                @season.Fullname (@season.Year)
+                            </option>
+                        }
+                    }
+                </select>
+                <p class="text-xs text-gray-400 mt-1">
+                    Lig seçtiğinizde sezonlar otomatik güncellenecek.
+                </p>
+            </div>
+    
 
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">
@@ -367,83 +318,71 @@
                   transition" />
             </div>
 
-            <div x-data="playerSearchComponent()" class="relative">
+            <div   class="relative">
                 <label class="block text-sm font-medium text-gray-700 mb-1">
-                    Golü Atan Oyuncu
+                    Oyuncu Ara
                 </label>
-
-                <!-- Hidden gerçek PlayerId -->
-                <input type="hidden" name="PlayerId" x-model="selectedPlayerId" />
-
-                <!-- Text input (autocomplete) -->
+                <!-- Oyuncu Arama Input -->
                 <input type="text"
-                       name="PlayerName"
                        x-model="query"
-                       @@input ="onInput"
+                       @@input="onInput"
                        placeholder="Oyuncu ara (3 harf ve üzeri)..."
-                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm md:text-base
-                  focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400
-                  transition" />
+                       class="w-full border border-gray-300 rounded-lg px-3 py-2" />
 
-                <!-- Suggestions list -->
-                <div x-show="open"
-                     @@click.away ="open = false"
-                     class="absolute z-50 w-full bg-white border border-gray-200 rounded-lg shadow-lg mt-1 max-h-60 overflow-auto animate-fadeIn">
+                <!-- Loading Spinner -->
+                <div x-show="loading" class="flex justify-center py-4">
+                    <div class="w-6 h-6 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                </div>
+
+                <!-- Result Grid -->
+                <div x-show="open && results.length > 0"
+                     @@click.away="open = false"
+                     class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mt-3">
 
                     <template x-for="p in results" :key="p.id">
-                        <div @@click ="selectPlayer(p)"
-                             class="flex items-center gap-3 px-3 py-2 hover:bg-gray-100 cursor-pointer transition">
 
-                            <!-- Oyuncu foto -->
-                            <img :src="p.image_Url"
-                                 class="w-12 h-12 rounded-full object-cover border shadow-sm" />
+                        <div @@click="selectPlayer(p)"
+                             class="bg-white border rounded-xl shadow-sm p-4
+                        cursor-pointer hover:shadow-md hover:scale-[1.02]
+                        transition flex flex-col items-center text-center relative">
 
-                            <div class="flex-1">
+                            <!-- Foto -->
+                            <img :src="p.image_Url || '/images/default-player.png'"
+                                 class="w-20 h-20 rounded-full border mb-3" />
 
-                                <!-- Oyuncu ad + numara -->
-                                <div class="flex items-center justify-between">
-                                    <div class="font-semibold text-gray-800" x-text="p.fullname"></div>
-                                    <div class="text-xs text-gray-500 font-medium" x-text="'#' + p.number"></div>
-                                </div>
-
-                                <!-- Pozisyon -->
-                                <div class="text-xs text-gray-500"
-                                     x-text="p.position?.name ?? 'Pozisyon yok'">
-                                </div>
-
-                                <!-- Takım Bilgisi -->
-                                <template x-if="p.team">
-                                    <div class="flex items-center gap-2 mt-1">
-
-                                        <!-- Takım logo -->
-                                        <img :src="p.team.image_Url"
-                                             class="w-6 h-6 rounded-full object-cover border" />
-
-                                        <div class="text-xs text-gray-700">
-                                            <span class="font-medium" x-text="p.team.name"></span>
-
-                                            <!-- Lig + Şehir -->
-                                            <template x-if="p.team.league">
-                                                <span class="text-gray-500">
-                                                    • <span x-text="p.team.league.name"></span>,
-                                                    <span x-text="p.team.league.province?.name"></span>
-                                                </span>
-                                            </template>
-                                        </div>
-
-                                    </div>
-                                </template>
-
+                            <!-- Numara -->
+                            <div class="absolute top-2 right-2 bg-gray-900 text-white
+                            text-xs px-2 py-1 rounded-full">
+                                #<span x-text="p.number || '-'"></span>
                             </div>
+
+                            <!-- İsim -->
+                            <div class="font-semibold text-gray-800 text-sm" x-text="p.fullname"></div>
+
+                            <!-- Pozisyon -->
+                            <div class="text-xs text-gray-500 mb-1"
+                                 x-text="p.position?.name ?? 'Pozisyon'"></div>
+
+                            <!-- Takım -->
+                            <div class="flex items-center gap-2 mb-2">
+                                <img :src="p.team?.image_Url || '/images/default_team.png'"
+                                     class="w-6 h-6 rounded-full border" />
+                                <span class="text-xs" x-text="p.team?.name ?? 'Takım Yok'"></span>
+                            </div>
+
+                            <!-- Lig -->
+                            <span class="text-[10px] px-2 py-0.5 rounded-full text-white"
+                                  :class="leagueColor(p.team?.league?.name)"
+                                  x-text="p.team?.league?.name">
+                            </span>
                         </div>
                     </template>
 
-
-                    <div x-show="loading" class="px-3 py-2 text-sm text-gray-500">
-                        Aranıyor...
-                    </div>
                 </div>
+
             </div>
+
+
 
             <!-- Opsiyonel: Lig & Sezon (ayrı logic yapacaksan bunları da kullanabilirsin) -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -481,26 +420,8 @@
                               transition" />
             </div>
 
-            <button type="submit"
-                    class="w-full bg-emerald-600 text-white py-2.5 rounded-xl font-semibold
-                           hover:bg-emerald-700 active:scale-[0.98]
-                           transition-transform transition-colors duration-200 shadow">
-                Haftanın Gollerini Kaydet
-            </button>
+            <button type="submit" class="w-full bg-blue-600 text-white py-2.5 rounded-xl font-semibold hover:bg-blue-700 active:scale-[0.98] transition-transform transition-colors duration-200 shadow"> Haftanın Gölünü Kaydet </button>
 
-            @if (!string.IsNullOrEmpty(Model.YoutubeEmbedLink) && activeTab == 2)
-            {
-                <div class="mt-6">
-                    <h4 class="text-base font-semibold mb-2 text-gray-800">Önizleme</h4>
-                    <div class="relative w-full overflow-hidden rounded-xl shadow-lg" style="padding-top: 56.25%;">
-                        <iframe class="absolute inset-0 w-full h-full"
-                                src="@Model.YoutubeEmbedLink"
-                                frameborder="0"
-                                allowfullscreen>
-                        </iframe>
-                    </div>
-                </div>
-            }
         </form>
     </div>
 </div>
@@ -554,8 +475,8 @@
     $("#LeagueId").change(function () {
         let leagueId = $(this).val();
 
-        $("#Season").empty();
-        $("#Season").append(`<option value="">-- Sezon Seçin --</option>`);
+        $("#SeasonId").empty();
+        $("#SeasonId").append(`<option value="">-- Sezon Seçin --</option>`);
 
         if (leagueId === "") return;
 
@@ -564,21 +485,40 @@
             type: "GET",
             success: function (data) {
                 data.forEach(function (s) {
-                    $("#Season").append(
-                        `<option value="${s.fullname}">${s.fullname} (${s.year})</option>`
+                    $("#SeasonId").append(
+                        `<option value="${s.id}">${s.fullname} (${s.year})</option>`
                     );
                 });
             }
         });
     });
-    function playerSearchComponent() {
+
+        function playerSearchComponent() {
         return {
             query: "",
             results: [],
             loading: false,
             open: false,
             selectedPlayerId: "",
+            selectedPlayerJson: "", 
+        selectedPlayerName: "",
+
             debounceTimer: null,
+
+            leagueColor(name) {
+                if (!name) return "bg-gray-700";
+                name = name.toLowerCase();
+
+                if (name.includes("istanbul")) return "bg-blue-600";
+                if (name.includes("ankara")) return "bg-red-600";
+                if (name.includes("izmir")) return "bg-purple-600";
+                if (name.includes("bursa")) return "bg-green-600";
+                if (name.includes("adana")) return "bg-orange-500";
+                if (name.includes("antalya")) return "bg-amber-500";
+                if (name.includes("gaziantep")) return "bg-rose-600";
+
+                return "bg-gray-700";
+            },
 
             onInput() {
                 if (this.query.length < 3) {
@@ -590,33 +530,43 @@
 
                 this.debounceTimer = setTimeout(() => {
                     this.searchPlayers();
-                }, 300);
+                }, 250);
             },
 
-            searchPlayers() {
-                this.loading = true;
+                searchPlayers() {
+        this.loading = true;
+        this.open = false;   // önce tüm sonuçları kapat
+        this.results = [];   // eski sonuçları sıfırla
 
-                fetch(`/Panorama/SearchPlayers?term=${encodeURIComponent(this.query)}`)
-                    .then(res => res.json())
-                    .then(data => {
-                        this.results = data;
-                        this.open = true;
-                        this.loading = false;
-                    });
-            },
+        // DOM güncellemesi için küçük bir delay
+        setTimeout(() => {
 
-               selectPlayer(p) {
-        this.query = p.fullname;
-        this.selectedPlayerId = p.id;
+            fetch(`/Panorama/SearchPlayers?term=${encodeURIComponent(this.query)}`)
+                .then(res => res.json())
+                .then(data => {
+                    this.results = data;
+                    this.open = true;
+                })
+                .finally(() => {
+                    this.loading = false;
+                });
 
-        this.selectedTeamName = p.team?.name ?? "";
-        this.selectedLeagueName = p.team?.league?.name ?? "";
-        this.selectedProvinceName = p.team?.league?.province?.name ?? "";
-
-        this.open = false;
+        }, 10);
     }
+    ,
 
+            selectPlayer(p) {
+      this.query = p.fullname;
+    this.selectedPlayerId = p.id;
+        this.selectedPlayerName = p.fullname;
+
+    this.selectedPlayerJson = JSON.stringify(p); // ✔ DOĞRU MODEL
+    this.open = false;
+
+            }
         }
     }
+
+
 </script>
- 
+

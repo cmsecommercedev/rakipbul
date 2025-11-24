@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 public class PanoramaViewModel
@@ -24,13 +24,15 @@ public class PanoramaFormModel
 {
     public int ActiveTab { get; set; }
     public int? LeagueId { get; set; }
-    public string Season { get; set; }
+    public string? Season { get; set; }
     public DateTime? StartDate { get; set; }
     public DateTime? EndDate { get; set; }
-    public string YoutubeEmbedLink { get; set; }
+    public string? YoutubeEmbedLink { get; set; }
+    public int? SeasonId { get; set; }   
 
-    public string Title { get; set; }
+    public string? Title { get; set; }
     public int? PlayerId { get; set; }
-    public string PlayerName { get; set; }
+    public string? PlayerName { get; set; }
+    public string? PlayerJson { get; set; }
 
 }

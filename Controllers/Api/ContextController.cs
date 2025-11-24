@@ -1,15 +1,16 @@
-using RakipBul.Data;
-using RakipBul.Models.Dtos;// NotificationManager için
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
+using Rakipbul.Models;
 using RakipBul.Attributes; // Kullanıcının kimliğini almak için (opsiyonel)
-using System;
+using RakipBul.Data;
 using RakipBul.Models;
+using RakipBul.Models.Dtos;// NotificationManager için
+using System;
 
 namespace RakipBul.Controllers.Api // Namespace'i kontrol edin
 {
-    [ApiKeyAuth]
+    //[ApiKeyAuth]
     [Route("api/[controller]")]
     [ApiController]
     public class ContextController : ControllerBase
@@ -239,5 +240,68 @@ namespace RakipBul.Controllers.Api // Namespace'i kontrol edin
                 return StatusCode(500, new { error = "Uygulama ayarları yüklenirken bir hata oluştu" });
             }
         }
+
+        [HttpGet("panorama/today")]
+        public async Task<ActionResult<IEnumerable<PanoramaDto>>> GetTodayPanoramaEntries(
+     [FromQuery] int leagueId,
+     [FromQuery] int seasonId,
+     [FromQuery] PanoramaCategory category)
+        {
+            if (leagueId <= 0)
+                return BadRequest(new { message = "Geçerli bir LeagueId gönderilmelidir." });
+
+            if (seasonId <= 0)
+                return BadRequest(new { message = "Geçerli bir SeasonId gönderilmelidir." });
+
+            if (!Enum.IsDefined(typeof(PanoramaCategory), category))
+                return BadRequest(new { message = "Geçersiz kategori. (1=Panorama, 2=Goals)" });
+
+            var today = DateTime.UtcNow.Date;
+
+            var panoramas = await _context.PanoramaEntries
+                .AsNoTracking()
+                .Where(p =>
+                    p.LeagueId == leagueId &&
+                    p.SeasonId == seasonId &&
+                    p.Category == category &&     // ✔ kategori filtresi
+                    p.StartDate <= today &&
+                    p.EndDate >= today
+                )
+                .Select(p => new PanoramaDto
+                {
+                    Id = p.Id,
+                    Title = p.Title,
+                    StartDate = p.StartDate,
+                    EndDate = p.EndDate,
+                    YoutubeEmbedLink = p.YoutubeEmbedLink,
+
+                    PlayerId = p.PlayerId,
+                    PlayerName = p.PlayerName,
+                    PlayerImageUrl = p.PlayerImageUrl,
+                    PlayerPosition = p.PlayerPosition,
+
+                    TeamId = p.TeamId,
+                    TeamName = p.TeamName,
+                    TeamImageUrl = p.TeamImageUrl,
+
+                    LeagueId = p.LeagueId,
+                    LeagueName = p.LeagueName,
+                    ProvinceName = p.ProvinceName,
+
+                    CreatedAt = p.CreatedAt
+                })
+                .ToListAsync();
+
+            if (!panoramas.Any())
+            {
+                return NotFound(new
+                {
+                    message = "Bu lig, sezon ve kategori için bugünün tarih aralığında kayıt bulunamadı."
+                });
+            }
+
+            return Ok(panoramas);
+        }
+
     }
 }
