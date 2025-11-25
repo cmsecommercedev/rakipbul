@@ -2,6 +2,8 @@
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Rakipbul.Models;
+using Rakipbul.Services.IServices;
+using Rakipbul.ViewModels;
 using RakipBul.Data;
 using System.Collections.Generic; 
 using System.Linq;
@@ -12,26 +14,44 @@ namespace Controllers
     public class PanoramaController : Controller
     {
         private readonly RakipbulApiManager _rakipbulApiManager;
+        private readonly IPanoramaService _panoramaService;
         private readonly ApplicationDbContext _context;
 
 
-        public PanoramaController(RakipbulApiManager rakipbulApiManager, ApplicationDbContext context)
+        public PanoramaController(RakipbulApiManager rakipbulApiManager, ApplicationDbContext context, IPanoramaService panoramaService)
         {
             _rakipbulApiManager = rakipbulApiManager;
             _context = context;
-
+            _panoramaService = panoramaService;
         }
 
         [HttpGet]
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index(PanoramaFilterModel filter)
         {
             var leagues = await _rakipbulApiManager.GetLeaguesAsync();
-            var model = new PanoramaViewModel
+            var seasons = filter.LeagueId.HasValue
+                ? await _rakipbulApiManager.GetLeagueSeasonsAsync(filter.LeagueId.Value)
+                : new List<RakipbulSeasonDto>();
+
+            var items = await _panoramaService.GetFilteredAsync(filter);
+
+            var vm = new PanoramaViewModel
             {
-                Leagues = leagues
+                Leagues = leagues,
+                Seasons = seasons,
+                PanoramaList = new PanoramaListViewModel
+                {
+                    Leagues = leagues,
+                    Seasons = seasons,
+                    Filter = filter,
+                    Items = items
+                }
             };
-            return View(model);
+
+            return View(vm);
         }
+
+
 
         [HttpPost]
         public async Task<IActionResult> Index(PanoramaFormModel form)
@@ -92,6 +112,16 @@ namespace Controllers
                 ? "Panorama kaydedildi."
                 : "Haftanın golleri kaydedildi.";
 
+            var entries = await _panoramaService.GetFilteredAsync(new PanoramaFilterModel());
+
+            var listModel = new PanoramaListViewModel
+            {
+                Leagues = leagues,
+                Seasons = seasons,
+                Filter = new PanoramaFilterModel(),
+                Items = entries
+            };
+
             // Modeli geri doldur
             var model = new PanoramaViewModel
             {
@@ -105,7 +135,8 @@ namespace Controllers
                 ActiveTab = form.ActiveTab,
                 Title = form.Title,
                 PlayerId = form.PlayerId,
-                PlayerName = form.PlayerName
+                PlayerName = form.PlayerName,
+                PanoramaList = listModel
             };
 
             return View(model);
@@ -129,6 +160,56 @@ namespace Controllers
             return Json(result.Player); // SearchResponse içinde Players olduğunu varsayıyoruz
         }
 
+        [HttpGet]
+        public async Task<IActionResult> PanoramaList(PanoramaFilterModel filter)
+        {
+            var leagues = await _rakipbulApiManager.GetLeaguesAsync();
+            var seasons = new List<RakipbulSeasonDto>();
+
+            if (filter.LeagueId.HasValue)
+                seasons = await _rakipbulApiManager.GetLeagueSeasonsAsync(filter.LeagueId.Value);
+
+            // 👉 burada DB'den filtreye göre liste çekeceksin
+            var items = await _panoramaService.GetFilteredAsync(filter);
+
+            
+
+            var model = new PanoramaListViewModel
+            {
+                Leagues = leagues,
+                Seasons = seasons,
+                Filter = filter,
+                Items = items,
+                
+            };
+
+            return PartialView("_PanoramaList", model);
+        }
+        [HttpPost]
+        public async Task<IActionResult> DeletePanorama(int id)
+        {
+            await _panoramaService.DeleteAsync(id);
+            return RedirectToAction("Index");
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> Filter(PanoramaFilterModel filter)
+        {
+            var leagues = await _rakipbulApiManager.GetLeaguesAsync();
+            var seasons = filter.LeagueId.HasValue
+                ? await _rakipbulApiManager.GetLeagueSeasonsAsync(filter.LeagueId.Value)
+                : new List<RakipbulSeasonDto>();
+
+            var items = await _panoramaService.GetFilteredAsync(filter);
+
+            return PartialView("_PanoramaList", new PanoramaListViewModel
+            {
+                Leagues = leagues,
+                Seasons = seasons,
+                Filter = filter,
+                Items = items
+            });
+        }
 
     }
 }

@@ -45,7 +45,7 @@
 </style>
 
 
-<div class="max-w-5xl mx-auto py-8">
+<div class="bg-gray-800 max-w-5xl mx-auto py-8">
 
 
     <input type="hidden" name="PlayerId" x-model="selectedPlayerId" />
@@ -426,6 +426,10 @@
     </div>
 </div>
 
+<div id="panorama-list-container">
+    @await Html.PartialAsync("_PanoramaList", Model.PanoramaList)
+</div>
+
 <!-- jQuery (Sezonları dinamik doldurmak için) -->
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
@@ -568,5 +572,49 @@
     }
 
 
+</script>
+
+
+<script>
+    $(document).on("submit", "#panorama-filter-form", function (e) {
+        e.preventDefault();
+
+        $("#loading").removeClass("hidden");
+
+        $.ajax({
+            url: "/Panorama/Filter",
+            type: "GET",
+            data: $(this).serialize(),
+            success: function (html) {
+                $("#panorama-list-container").html(html);
+            },
+            complete: function () {
+                $("#loading").addClass("hidden");
+            }
+        });
+    });
+
+</script>
+
+<script>
+    function videoModal() {
+        return {
+            isOpen: false,
+            embedUrl: '',
+            openVideo(url) {
+                this.embedUrl = url;
+                this.isOpen = true;
+            },
+                openVideo(url) {
+        this.embedUrl = url + "?autoplay=1";
+        this.isOpen = true;
+    },
+    close() {
+        this.embedUrl = "";
+        this.isOpen = false;
+    }
+
+        }
+    }
 </script>
 

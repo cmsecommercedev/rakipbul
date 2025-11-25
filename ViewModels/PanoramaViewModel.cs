@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Rakipbul.ViewModels;
+using System;
 using System.Collections.Generic;
 
 public class PanoramaViewModel
@@ -16,6 +17,7 @@ public class PanoramaViewModel
     public string Title { get; set; }
     public int? PlayerId { get; set; }
     public string PlayerName { get; set; }
+    public PanoramaListViewModel PanoramaList { get; set; }
 
 
 }
