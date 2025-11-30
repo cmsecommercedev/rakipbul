@@ -1,10 +1,11 @@
+using DocumentFormat.OpenXml.Wordprocessing;
 using FirebaseAdmin;
 using FirebaseAdmin.Messaging;
-using RakipBul.Data; 
 using Google.Apis.Auth.OAuth2;
 using Microsoft.EntityFrameworkCore;
 using Rakipbul.Models;
 using Rakipbul.Models.Dtos;
+using RakipBul.Data; 
 
 namespace RakipBul.Managers
 {
@@ -14,13 +15,17 @@ namespace RakipBul.Managers
         private readonly ILogger _logger;
         private readonly FirebaseMessaging _firebaseMessaging;
         private readonly ApplicationDbContext _context;
+        private readonly OpenAiManager _aiManager;
 
 
-        public NotificationManager(IConfiguration configuration, ILogger<NotificationManager> logger, ApplicationDbContext context)
+
+        public NotificationManager(IConfiguration configuration, ILogger<NotificationManager> logger, ApplicationDbContext context, OpenAiManager aiManager)
         {
             _configuration = configuration;
             _logger = logger;
-            _context = context;
+            _context = context;            
+            _aiManager = aiManager;
+
 
             if (FirebaseApp.DefaultInstance == null)
             {
@@ -54,22 +59,44 @@ namespace RakipBul.Managers
             _firebaseMessaging = FirebaseMessaging.DefaultInstance;
         }
 
-        public async Task<(bool success, string message)> SendNotificationToAllUsers(NotificationViewModel model,string topic)
+        public async Task<(bool success, string message)> SendNotificationToAllUsers(NotificationViewModel model, string topic)
         {
             try
             {
+                // SON parça dil kodu (ör: all_users_tr → tr)
+                var culture = topic.Split('_').LastOrDefault()?.ToLower() ?? "tr";
+
+                // Sadece tr veya en olarak ele al
+                bool isTurkish = culture == "tr";
+
+                string title;
+                string body;
+
+                if (isTurkish)
+                {
+                    // Ana dil: Türkçe
+                    title = model.TitleTr ?? string.Empty;
+                    body = model.MessageTr ?? string.Empty;
+                }
+                else
+                {
+                    // İngilizce çeviri gerekiyorsa AI'dan çevir
+                    title = await _aiManager.TranslateFromTurkishAsync(model.TitleTr ?? string.Empty, "English");
+                    body = await _aiManager.TranslateFromTurkishAsync(model.MessageTr ?? string.Empty, "English");
+                }
+
                 var message = new Message()
                 {
                     Notification = new Notification()
                     {
-                        Title = model.TitleTr,
-                        Body = model.MessageTr
+                        Title = title,
+                        Body = body
                     },
-                    Topic =topic // This will send to all users subscribed to the "all_users" topic
+                    Topic = topic
                 };
 
                 var response = await _firebaseMessaging.SendAsync(message);
-                return (true, response); // response mesaj ID'sidir
+                return (true, response);
             }
             catch (Exception ex)
             {
@@ -77,6 +104,7 @@ namespace RakipBul.Managers
                 return (false, "Bildirim gönderilirken bir hata oluştu.");
             }
         }
+
 
         public async Task<(bool success, string message)> SendNotificationToUser(string deviceToken, NotificationViewModel model)
         {
