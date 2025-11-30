@@ -29,7 +29,7 @@ namespace Controllers
         public async Task<IActionResult> Index(PanoramaFilterModel filter)
         {
             var leagues = await _rakipbulApiManager.GetLeaguesAsync();
-            var seasons = filter.LeagueId.HasValue
+            var seasonOptions = filter.LeagueId.HasValue
                 ? await _rakipbulApiManager.GetLeagueSeasonsAsync(filter.LeagueId.Value)
                 : new List<RakipbulSeasonDto>();
 
@@ -38,11 +38,10 @@ namespace Controllers
             var vm = new PanoramaViewModel
             {
                 Leagues = leagues,
-                Seasons = seasons,
+                Seasons = seasonOptions,
                 PanoramaList = new PanoramaListViewModel
                 {
                     Leagues = leagues,
-                    Seasons = seasons,
                     Filter = filter,
                     Items = items
                 }
@@ -117,7 +116,6 @@ namespace Controllers
             var listModel = new PanoramaListViewModel
             {
                 Leagues = leagues,
-                Seasons = seasons,
                 Filter = new PanoramaFilterModel(),
                 Items = entries
             };
@@ -164,12 +162,7 @@ namespace Controllers
         public async Task<IActionResult> PanoramaList(PanoramaFilterModel filter)
         {
             var leagues = await _rakipbulApiManager.GetLeaguesAsync();
-            var seasons = new List<RakipbulSeasonDto>();
 
-            if (filter.LeagueId.HasValue)
-                seasons = await _rakipbulApiManager.GetLeagueSeasonsAsync(filter.LeagueId.Value);
-
-            // 👉 burada DB'den filtreye göre liste çekeceksin
             var items = await _panoramaService.GetFilteredAsync(filter);
 
             
@@ -177,7 +170,6 @@ namespace Controllers
             var model = new PanoramaListViewModel
             {
                 Leagues = leagues,
-                Seasons = seasons,
                 Filter = filter,
                 Items = items,
                 
@@ -196,16 +188,12 @@ namespace Controllers
         public async Task<IActionResult> Filter(PanoramaFilterModel filter)
         {
             var leagues = await _rakipbulApiManager.GetLeaguesAsync();
-            var seasons = filter.LeagueId.HasValue
-                ? await _rakipbulApiManager.GetLeagueSeasonsAsync(filter.LeagueId.Value)
-                : new List<RakipbulSeasonDto>();
 
             var items = await _panoramaService.GetFilteredAsync(filter);
 
             return PartialView("_PanoramaList", new PanoramaListViewModel
             {
                 Leagues = leagues,
-                Seasons = seasons,
                 Filter = filter,
                 Items = items
             });

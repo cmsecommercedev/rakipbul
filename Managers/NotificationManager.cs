@@ -6,6 +6,9 @@ using RakipBul.ViewModels;
 using FirebaseAdmin;
 using FirebaseAdmin.Messaging;
 using Google.Apis.Auth.OAuth2;
+using RakipBul.Data;
+using Microsoft.EntityFrameworkCore;
+using RakipBul.Models;
 
 namespace RakipBul.Managers
 {
@@ -15,11 +18,14 @@ namespace RakipBul.Managers
         private readonly ILogger _logger;
         private readonly FirebaseMessaging _firebaseMessaging;
         private readonly OpenAiManager _aiManager;
+        private readonly ApplicationDbContext _context;
 
-        public NotificationManager(IConfiguration configuration, ILogger<NotificationManager> logger, OpenAiManager aiManager)
+
+        public NotificationManager(IConfiguration configuration, ILogger<NotificationManager> logger, OpenAiManager aiManager, ApplicationDbContext context)
         {
             _configuration = configuration;
             _logger = logger;
+            _context = context;
             _aiManager = aiManager;
 
             if (FirebaseApp.DefaultInstance == null)
@@ -39,16 +45,14 @@ namespace RakipBul.Managers
             _firebaseMessaging = FirebaseMessaging.DefaultInstance;
         }
 
-        public async Task<(bool success, string message)> SendNotificationToAllUsers(NotificationViewModel model,string topicnoculture)
+        public async Task<(bool success, string message)> SendNotificationToAllUsers(NotificationViewModel model, string topicnoculture)
         {
             try
             {
                 // Languages: tr (original), ru, ro, en
                 var languages = new List<(string langCode, string displayName)>
                 {
-                    ("tr", "Turkish"),
-                    ("ru", "Russian"),
-                    ("ro", "Romanian"),
+                    ("tr", "Turkish"), 
                     ("en", "English")
                 };
 
@@ -156,45 +160,89 @@ namespace RakipBul.Managers
         /// <summary>
         /// Bir veya birden fazla cihazı (token) belirtilen topic'e abone eder.
         /// </summary>
-        public async Task<(bool success, string message)> SubscribeToTopicAsync(IReadOnlyList<string> deviceTokens, string topic)
+        public async Task<(bool success, string message)> SubscribeToTopicAsync(
+      string token,
+      string topic,
+      string platform = "Unknown")
         {
             try
             {
-                var response = await _firebaseMessaging.SubscribeToTopicAsync(deviceTokens, topic);
+                // 1) Bu token + topic kaydı var mı?
+                var exists = await _context.DeviceTokens
+                    .AnyAsync(x => x.Token == token && x.Topic == topic);
+
+                if (exists)
+                    return (true, "Zaten bu topic'e abone.");
+
+                // 2) Firebase subscribe
+                var response = await _firebaseMessaging
+                    .SubscribeToTopicAsync(new[] { token }, topic);
+
                 if (response.FailureCount > 0)
                 {
-                    var errors = response.Errors.Select(e => $"[{e.Index}] {e.Reason}");
-                    return (false, $"Bazı tokenlar abone edilemedi: {string.Join(", ", errors)}");
+                    var error = response.Errors.First().Reason;
+                    return (false, $"Firebase subscribe başarısız: {error}");
                 }
-                return (true, $"{response.SuccessCount} cihaz '{topic}' konusuna abone edildi.");
+
+                // 3) DB’ye yeni kayıt ekle
+                _context.DeviceTokens.Add(new DeviceToken
+                {
+                    Token = token,
+                    Topic = topic,
+                    Platform = platform,
+                    CreatedAt = DateTime.UtcNow
+                });
+
+                await _context.SaveChangesAsync();
+
+                return (true, "Topic'e abone edildi.");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Topic'e abone edilirken hata oluştu");
+                _logger.LogError(ex, "Subscribe hatası");
                 return (false, "Topic'e abone edilirken bir hata oluştu.");
             }
         }
 
+
         /// <summary>
         /// Bir veya birden fazla cihazı (token) belirtilen topic'ten çıkarır.
         /// </summary>
-        public async Task<(bool success, string message)> UnsubscribeFromTopicAsync(IReadOnlyList<string> deviceTokens, string topic)
+        public async Task<(bool success, string message)> UnsubscribeFromTopicAsync(
+    string token,
+    string topic)
         {
             try
             {
-                var response = await _firebaseMessaging.UnsubscribeFromTopicAsync(deviceTokens, topic);
+                // 1) Token-topic kaydını bul
+                var record = await _context.DeviceTokens
+                    .FirstOrDefaultAsync(x => x.Token == token && x.Topic == topic);
+
+                if (record == null)
+                    return (true, "Zaten bu topic'te kayıt yok.");
+
+                // 2) Firebase unsubscribe
+                var response = await _firebaseMessaging
+                    .UnsubscribeFromTopicAsync(new[] { token }, topic);
+
                 if (response.FailureCount > 0)
                 {
-                    var errors = response.Errors.Select(e => $"[{e.Index}] {e.Reason}");
-                    return (false, $"Bazı tokenlar topic'ten çıkarılamadı: {string.Join(", ", errors)}");
+                    var error = response.Errors.First().Reason;
+                    return (false, $"Firebase unsubscribe başarısız: {error}");
                 }
-                return (true, $"{response.SuccessCount} cihaz '{topic}' konusundan çıkarıldı.");
+
+                // 3) DB kaydını sil
+                _context.DeviceTokens.Remove(record);
+                await _context.SaveChangesAsync();
+
+                return (true, "Topic'ten çıkarıldı.");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Topic'ten çıkarılırken hata oluştu");
+                _logger.LogError(ex, "Unsubscribe hatası");
                 return (false, "Topic'ten çıkarılırken bir hata oluştu.");
             }
         }
+
     }
 }
