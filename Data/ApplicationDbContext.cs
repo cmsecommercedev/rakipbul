@@ -47,6 +47,7 @@ namespace RakipBul.Data
         public DbSet<StoryContent> StoryContents { get; set; }
         public DbSet<PanoramaEntry> PanoramaEntries { get; set; }
 
+        public DbSet<DeviceToken> DeviceTokens { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

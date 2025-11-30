@@ -22,13 +22,13 @@ namespace RakipBul.Controllers.Api
             _logger = logger;
         }
 
-        [HttpPost("send")]
-        public async Task<IActionResult> Send([FromBody] NotificationViewModel model)
+        [HttpPost("send-everyone")]
+        public async Task<IActionResult> Send([FromBody] NotificationViewModel model,string culture)
         {
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
-            var topic = $"all_users";
+            var topic = $"all_users_{culture}";
 
             var result = await _notificationManager.SendNotificationToAllUsers(model,topic);
             if (result.success)
@@ -38,13 +38,13 @@ namespace RakipBul.Controllers.Api
             return StatusCode(500, new { success = false, message = result.message });
         }
 
-        [HttpPost("sendteam")]
-        public async Task<IActionResult> SendTeam([FromBody] NotificationViewModel model,int teamid)
+        [HttpPost("send-team")]
+        public async Task<IActionResult> SendTeam([FromBody] NotificationViewModel model,int teamid, string culture)
         {
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
-            string topic = $"team_{teamid}";
+            string topic = $"team_{teamid}_{culture}";
 
 
             var result = await _notificationManager.SendNotificationToAllUsers(model, topic);
@@ -55,13 +55,13 @@ namespace RakipBul.Controllers.Api
             return StatusCode(500, new { success = false, message = result.message });
         }
 
-        [HttpPost("sendplayer")]
-        public async Task<IActionResult> SendPlayer([FromBody] NotificationViewModel model, int playerid)
+        [HttpPost("send-player")]
+        public async Task<IActionResult> SendPlayer([FromBody] NotificationViewModel model, int playerid, string culture)
         {
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
-            string topic = $"player_{playerid}";
+            string topic = $"player_{playerid}_{culture}";
 
             var result = await _notificationManager.SendNotificationToAllUsers(model, topic);
             if (result.success)

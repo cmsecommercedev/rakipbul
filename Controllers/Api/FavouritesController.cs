@@ -42,13 +42,14 @@ namespace RakipBul.Controllers.Api // Namespace'i kontrol edin
                 return BadRequest("Geçersiz macid veya kullanıcı token bilgisi.");
 
 
-            var result = await _notificationManager.SubscribeToTopicAsync(new[] { userToken }, $"all_users_{culture}");
+            var result = await _notificationManager.SubscribeToTopicAsync(userToken, $"all_users_{culture}");
 
             if (result.success)
                 return Ok(new { success = true, message = $"Kullanıcı başarıyla eklendi" });
             else
                 return StatusCode(500, new { success = false, message = $"Hata: {result.message}" });
         }
+
         [HttpPost("addteamtofav")]
         public async Task<IActionResult> AddTeamToFav([FromQuery] int teamId, [FromQuery] string userToken, string MacID, string culture = "tr")
         {
@@ -72,7 +73,7 @@ namespace RakipBul.Controllers.Api // Namespace'i kontrol edin
 
             // Firebase topic abone et
             string topic = $"team_{teamId}_{culture}";
-            var result = await _notificationManager.SubscribeToTopicAsync(new[] { userToken }, topic);
+            var result = await _notificationManager.SubscribeToTopicAsync(userToken, topic);
 
             if (result.success)
                 return Ok(new { success = true, message = $"Takım favorilere eklendi ve topic'e abone olundu: {topic}" });
@@ -100,14 +101,13 @@ namespace RakipBul.Controllers.Api // Namespace'i kontrol edin
             // Firebase topic'ten çıkar - kaydedilen culture'ı kullan
             var topicCulture = string.IsNullOrWhiteSpace(fav.Culture) ? culture : fav.Culture;
             string topic = $"team_{teamId}_{topicCulture}";
-            var result = await _notificationManager.UnsubscribeFromTopicAsync(new[] { userToken }, topic);
+            var result = await _notificationManager.UnsubscribeFromTopicAsync(userToken, topic);
 
             if (result.success)
                 return Ok(new { success = true, message = $"Takım favorilerden çıkarıldı ve topic'ten çıkıldı: {topic}" });
             else
                 return StatusCode(500, new { success = false, message = $"Favorilerden çıkarıldı fakat topic'ten çıkılamadı: {result.message}" });
         }
-
 
         [HttpGet("isteamfav")]
         public async Task<IActionResult> IsTeamFav([FromQuery] int teamId, [FromQuery] string macId)
@@ -144,7 +144,7 @@ namespace RakipBul.Controllers.Api // Namespace'i kontrol edin
 
             // Firebase topic abone et
             string topic = $"player_{playerId}_{culture}";
-            var result = await _notificationManager.SubscribeToTopicAsync(new[] { userToken }, topic);
+            var result = await _notificationManager.SubscribeToTopicAsync(userToken, topic);
 
             if (result.success)
                 return Ok(new { success = true, message = $"Oyuncu favorilere eklendi ve topic'e abone olundu: {topic}" });
@@ -172,7 +172,7 @@ namespace RakipBul.Controllers.Api // Namespace'i kontrol edin
             // Firebase topic'ten çıkar - kaydedilen culture'ı kullan
             var topicCulture = string.IsNullOrWhiteSpace(fav.Culture) ? culture : fav.Culture;
             string topic = $"player_{playerId}_{topicCulture}";
-            var result = await _notificationManager.UnsubscribeFromTopicAsync(new[] { userToken }, topic);
+            var result = await _notificationManager.UnsubscribeFromTopicAsync(userToken, topic);
 
             if (result.success)
                 return Ok(new { success = true, message = $"Oyuncu favorilerden çıkarıldı ve topic'ten çıkıldı: {topic}" });
