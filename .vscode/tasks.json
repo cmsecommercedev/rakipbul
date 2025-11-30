@@ -7,7 +7,7 @@
             "type": "process",
             "args": [
                 "build",
-                "${workspaceFolder}/BussinessCupApi.sln",
+                "${workspaceFolder}/Rakipbul.sln",
                 "/property:GenerateFullPaths=true",
                 "/consoleloggerparameters:NoSummary;ForceNoAlign"
             ],
@@ -33,7 +33,7 @@
                 "watch",
                 "run",
                 "--project",
-                "${workspaceFolder}/BussinessCupApi.sln"
+                "${workspaceFolder}/Rakipbul.sln"
             ],
             "problemMatcher": "$msCompile"
         }

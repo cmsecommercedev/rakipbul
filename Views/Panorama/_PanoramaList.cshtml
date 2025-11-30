@@ -1,186 +1,252 @@
 ﻿@using Rakipbul.ViewModels
 @model PanoramaListViewModel
+@{
+    Func<string?, string> leagueBadgeClass = name =>
+    {
+        var key = (name ?? string.Empty).ToLowerInvariant();
+        if (key.Contains("istanbul")) return "bg-blue-500/25 text-blue-50";
+        if (key.Contains("ankara")) return "bg-red-500/25 text-red-50";
+        if (key.Contains("izmir")) return "bg-purple-500/25 text-purple-50";
+        if (key.Contains("bursa")) return "bg-green-500/25 text-green-50";
+        if (key.Contains("adana")) return "bg-orange-500/25 text-orange-50";
+        if (key.Contains("antalya")) return "bg-amber-500/25 text-amber-50";
+        if (key.Contains("gaziantep")) return "bg-rose-500/25 text-rose-50";
+        return "bg-gray-600/50 text-gray-100";
+    };
+}
 
-<div class="bg-white p-4 rounded-xl shadow-lg border border-gray-700 relative">
-    <div id="loading" class="hidden absolute inset-0 bg-black bg-opacity-20 flex items-center justify-center z-50">
-        <div class="animate-spin h-10 w-10 border-4 border-blue-500 border-t-transparent rounded-full"></div>
-    </div>
-    <!-- FILTER HEADER -->
-    <form id="panorama-filter-form" method="get"
-          class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+<div class="max-w-6xl mx-auto">
+    <div class="relative">
 
-        <!-- Lig -->
-        <div>
-            <label class="block text-sm font-medium text-gray-300 mb-1">Lig</label>
-            <select name="LeagueId" class="w-full border border-gray-700 bg-gray-800 text-gray-200 rounded-lg px-3 py-2">
-                <option value="">Tümü</option>
-                @foreach (var l in Model.Leagues)
-                {
-                    <option value="@l.Id" selected="@(Model.Filter.LeagueId == l.Id)">
-                        @l.Name
-                    </option>
-                }
-            </select>
+        <!-- Loading -->
+        <div id="loading"
+            class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[70]">
+            <div class="bg-gray-800 px-6 py-5 rounded-lg border border-gray-700 shadow-xl flex items-center gap-4">
+                <div class="animate-spin h-10 w-10 border-4 border-yellow-500 border-t-transparent rounded-full"></div>
+                <div>
+                    <p class="text-white font-semibold">Filtreleniyor</p>
+                    <p class="text-gray-300 text-sm">Lütfen bekleyin...</p>
+                </div>
+            </div>
         </div>
 
-        <!-- Sezon -->
-        <div>
-            <label class="block text-sm font-medium text-gray-300 mb-1">Sezon</label>
-            <select name="Season" class="w-full border border-gray-700 bg-gray-800 text-gray-200 rounded-lg px-3 py-2">
-                <option value="">Tümü</option>
-                @foreach (var s in Model.Seasons)
-                {
-                    <option value="@s.Fullname" selected="@(Model.Filter.Season == s.Fullname)">
-                        @s.Fullname (@s.Year)
-                    </option>
-                }
-            </select>
-        </div>
-
-        <!-- Tarih Aralığı -->
-        <div>
-            <label class="block text-sm font-medium text-gray-300 mb-1">Başlangıç</label>
-            <input type="date" name="StartDate"
-                   value="@Model.Filter.StartDate?.ToString("yyyy-MM-dd")"
-                   class="w-full border border-gray-700 bg-gray-800 text-gray-200 rounded-lg px-3 py-2" />
-        </div>
-        <div>
-            <label class="block text-sm font-medium text-gray-300 mb-1">Bitiş</label>
-            <input type="date" name="EndDate"
-                   value="@Model.Filter.EndDate?.ToString("yyyy-MM-dd")"
-                   class="w-full border border-gray-700 bg-gray-800 text-gray-200 rounded-lg px-3 py-2" />
-        </div>
-
-        <!-- Search Button -->
-        <div class="md:col-span-4 flex justify-end">
-            <button type="submit"
-                    class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition shadow">
-                Ara
-            </button>
-        </div>
-    </form>
-
-
-    <!-- RESULTS LIST -->
-    <div class="space-y-4">
-        @if (Model.Items.Any())
-        {
-            @foreach (var item in Model.Items)
-            {
-                <div class="p-4 bg-white rounded-lg border border-gray-700 shadow-sm flex justify-between items-center">
-
-                    <!-- LEFT CONTENT -->
+        <!-- FILTER HEADER -->
+        <div class="bg-gray-800 rounded-lg p-4 mb-6">
+            <h3 class="text-lg font-semibold text-gray-100 mb-4">Kayıtları Filtrele</h3>
+            <form id="panorama-filter-form" method="get" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                        <div class="font-semibold text-lg text-gray-100">@item.Title</div>
-                        <div class="text-sm text-gray-400">
-                            Lig: @item.LeagueName
-                        </div>
-
-                        <div class="text-xs text-gray-500 mt-1">
-                            @item.StartDate?.ToString("dd.MM.yyyy") - @item.EndDate?.ToString("dd.MM.yyyy")
-                        </div>
-
-                        @if (!string.IsNullOrEmpty(item.PlayerName))
-                        {
-                            <div class="text-sm text-emerald-400 mt-1">
-                                Golü Atan Oyuncu: @item.PlayerName
-                            </div>
-                        }
-
-                        @if (!string.IsNullOrEmpty(item.YoutubeEmbedLink))
-                        {
-                            <button type="button"
-                                    x-on:click="openVideo('@item.YoutubeEmbedLink.Replace("'", "\\'")')"
-                                    class="text-blue-400 hover:text-blue-300 text-sm mt-2 underline">
-                                Videoyu Aç
-                            </button>
-
-                        }
+                        <label class="block text-gray-300 mb-1 text-sm">Lig</label>
+                        <select name="LeagueId"
+                            class="w-full px-3 py-2 bg-gray-900 border border-gray-600 rounded-lg text-gray-200 focus:outline-none focus:border-yellow-500">
+                            <option value="">Tümü</option>
+                            @foreach (var l in Model.Leagues)
+                            {
+                                <option value="@l.Id" selected="@(Model.Filter.LeagueId == l.Id)">
+                                    @l.Name
+                                </option>
+                            }
+                        </select>
                     </div>
 
-                    <!-- RIGHT ACTIONS -->
                     <div>
-                        <div x-data="{ deleteOpen:false }">
+                        <label class="block text-gray-300 mb-1 text-sm">Başlangıç</label>
+                        <input type="date" name="StartDate" value="@Model.Filter.StartDate?.ToString("yyyy-MM-dd")"
+                            class="w-full px-3 py-2 bg-gray-900 border border-gray-600 rounded-lg text-gray-200 focus:outline-none focus:border-yellow-500" />
+                    </div>
 
-                            <!-- Sil butonu -->
-                            <button type="button"
-                                    @@click ="deleteOpen = true"
-                                    class="bg-red-600 text-white px-3 py-2 rounded-md hover:bg-red-700 shadow">
-                                Sil
-                            </button>
+                    <div>
+                        <label class="block text-gray-300 mb-1 text-sm">Bitiş</label>
+                        <input type="date" name="EndDate" value="@Model.Filter.EndDate?.ToString("yyyy-MM-dd")"
+                            class="w-full px-3 py-2 bg-gray-900 border border-gray-600 rounded-lg text-gray-200 focus:outline-none focus:border-yellow-500" />
+                    </div>
+                </div>
 
-                            <!-- Silme onay modali -->
-                            <div x-show="deleteOpen"
-                                 x-transition.opacity.duration.200ms
-                                 class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40 backdrop-blur-sm"
-                                 x-cloak>
+                <div class="flex flex-col sm:flex-row gap-3 justify-end">
+                    <button type="button" id="clear-filters"
+                        class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-lg text-sm font-medium transition">
+                        Temizle
+                    </button>
+                    <button type="submit"
+                        class="px-4 py-2 bg-yellow-500 hover:bg-yellow-400 text-gray-900 font-semibold rounded-lg">
+                        Ara
+                    </button>
+                </div>
+            </form>
+        </div>
 
-                                <div x-transition.scale.origin.center
-                                     class="bg-gray-900 border border-gray-700 rounded-lg p-6 w-80 shadow-xl">
+        <!-- RESULTS LIST -->
+        <div class="space-y-4">
+            @if (Model.Items.Any())
+            {
+                @foreach (var item in Model.Items)
+                {
+                    @* <div class="flex items-center gap-5 p-4 rounded-xl shadow-lg border transition-all hover:shadow-2xl
+     @(item.Category == PanoramaCategory.Panorama ? "bg-gray-700/60 border-gray-600" : "bg-gray-800 border-gray-700")"> *@
 
-                                    <h2 class="text-lg font-semibold text-gray-100 mb-2">
-                                        Kaydı Sil
-                                    </h2>
+                        <!-- Sol bilgi bloğu -->
+                        <div class="flex-1 flex flex-col gap-1 text-sm text-gray-300">
 
-                                    <p class="text-gray-300 mb-4 text-sm">
-                                        Bu panorama kaydını silmek istediğinize emin misiniz?
-                                    </p>
+                            <!-- Lig Badge -->
+                            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium
+                                         border border-white/10 shadow-sm bg-white/5 w-fit">
+                                <span class="inline-block w-1.5 h-1.5 rounded-full bg-white/80"></span>
+                                @item.LeagueName
+                            </span>
 
-                                    <div class="flex justify-end gap-3">
-                                        <button @@click ="deleteOpen = false"
-                                                class="px-4 py-2 rounded bg-gray-700 text-gray-200 hover:bg-gray-600">
-                                            Vazgeç
-                                        </button>
+                            <!-- Başlık -->
+                            <div class="text-gray-200 font-semibold text-base">
+                                @item.Title
+                            </div>
 
-                                        <form method="post" asp-action="DeletePanorama" asp-route-id="@item.Id">
-                                            <button type="submit"
-                                                    class="px-4 py-2 rounded bg-red-600 text-white hover:bg-red-700">
-                                                Evet, Sil
-                                            </button>
-                                        </form>
+                            <!-- Tarihler -->
+                            <div class="text-gray-400 text-xs">
+                                @item.StartDate?.ToString("dd.MM.yyyy") – @item.EndDate?.ToString("dd.MM.yyyy")
+                            </div>
+
+                            <!-- Takım -->
+                            @if (!string.IsNullOrEmpty(item.TeamName))
+                            {
+                                <div class="text-gray-300 text-xs">
+                                    <span class="text-gray-400">Takım:</span> @item.TeamName
+                                </div>
+                            }
+
+                            <!-- Oyuncu -->
+                            @if (!string.IsNullOrEmpty(item.PlayerName))
+                            {
+                                <div class="text-gray-300 text-xs flex items-center gap-1">
+                                    <svg class="w-4 h-4 text-emerald-400" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd"
+                                            d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z"
+                                            clip-rule="evenodd"></path>
+                                    </svg>
+                                    <span class="text-gray-400">Oyuncu:</span>
+                                    <span class="text-gray-200 font-medium">@item.PlayerName</span>
+                                </div>
+                            }
+                        </div>
+
+                        <!-- Sağdaki aksiyonlar -->
+                        <div class="flex flex-col items-end gap-2 min-w-[120px]">
+
+                            <!-- Video -->
+                            @if (!string.IsNullOrEmpty(item.YoutubeEmbedLink))
+                            {
+                                <button type="button"
+                                    class="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-medium"
+                                    onclick="window.dispatchEvent(new CustomEvent('trigger-video-modal',{ detail: { url: '@item.YoutubeEmbedLink' }}))">
+                                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                        <path
+                                            d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 001.553.894l2-1a1 1 0 000-1.788l-2-1z">
+                                        </path>
+                                    </svg>
+                                    İzle
+                                </button>
+                            }
+
+                            <!-- Sil Butonu + Modal -->
+                            <div x-data="{ deleteOpen: false }" class="relative">
+                                <button type="button" @@click="deleteOpen = true"
+                                    class="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white rounded-lg text-xs font-medium inline-flex items-center gap-1.5">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16">
+                                        </path>
+                                    </svg>
+                                    Sil
+                                </button>
+
+                                <!-- Modal -->
+                                <div x-cloak x-show="deleteOpen" x-transition.opacity
+                                    class="fixed inset-0 z-[80] flex items-center justify-center">
+
+                                    <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" @@click="deleteOpen = false">
                                     </div>
 
+                                    <div class="relative bg-gray-800 rounded-lg p-6 w-[90%] max-w-md shadow-2xl border border-gray-700"
+                                        x-show="deleteOpen" x-transition>
+
+                                        <div class="text-center space-y-4">
+                                            <div
+                                                class="w-12 h-12 bg-red-600/20 rounded-full flex items-center justify-center mx-auto">
+                                                <svg class="w-6 h-6 text-red-400" fill="none" stroke="currentColor"
+                                                    viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z">
+                                                    </path>
+                                                </svg>
+                                            </div>
+                                            <h2 class="text-lg font-semibold text-gray-100">Kaydı Sil</h2>
+                                            <p class="text-gray-400 text-sm">Bu panorama kaydını silmek istediğinize emin
+                                                misiniz?</p>
+
+                                            <div class="flex gap-3 justify-center pt-2">
+                                                <button @@click="deleteOpen = false" type="button"
+                                                    class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-lg text-sm">
+                                                    Vazgeç
+                                                </button>
+
+                                                <form method="post" asp-action="DeletePanorama" asp-route-id="@item.Id">
+                                                    <button type="submit"
+                                                        class="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg text-sm font-semibold">
+                                                        Evet, Sil
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        </div>
+
+                                    </div>
                                 </div>
                             </div>
 
-
                         </div>
+ 
+                }
 
+            }
+            else
+            {
+                <div class="bg-gray-800 border border-gray-700 rounded-lg p-12 text-center">
+                    <div class="w-16 h-16 bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <svg class="w-8 h-8 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                        </svg>
                     </div>
-
+                    <h3 class="text-lg font-semibold text-gray-100">Sonuç Bulunamadı</h3>
+                    <p class="text-gray-400 text-sm mt-2">Arama kriterlerinize uygun kayıt bulunamadı.</p>
                 </div>
             }
-        }
-        else
-        {
-            <div class="text-center text-gray-400 py-8">
-                Sonuç bulunamadı.
-            </div>
-        }
-    </div>
-
-</div>
-
-
-<!-- VIDEO MODAL -->
-<div x-data="videoModal()" x-show="isOpen"
-     class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 backdrop-blur-sm"
-     x-cloak>
-
-    <div class="bg-gray-900 w-full max-w-3xl rounded-xl shadow-lg relative p-4 border border-gray-700">
-
-        <button class="absolute top-2 right-2 text-gray-300 font-bold text-xl"
-                @@click ="close()">
-            ✕
-        </button>
-
-        <div class="relative w-full" style="padding-top: 56.25%;">
-            <iframe x-bind:src="embedUrl"
-                    frameborder="0"
-                    allowfullscreen
-                    class="absolute inset-0 w-full h-full rounded-lg">
-            </iframe>
         </div>
-
     </div>
 </div>
+
+<script>
+@functions {
+            string CategoryClass(int category)
+            {
+                return category switch
+                {
+                    1 => "bg-gray-700/60 border-gray-600 hover:bg-gray-700",   // Panorama
+                    2 => "bg-gray-800 border-gray-700 hover:bg-gray-750",      // Haftanın Golleri
+                    _ => "bg-gray-800 border-gray-700"
+                };
+            }
+        }
+        document.addEventListener("click", function (e) {
+            const clearButton = e.target.closest("#clear-filters");
+            if (!clearButton) return;
+
+            const form = document.getElementById("panorama-filter-form");
+            if (!form) return;
+
+            form.querySelectorAll("input, select").forEach(function (el) {
+                if (el.tagName === "SELECT" || el.type === "date" || el.type === "text") {
+                    el.value = "";
+                }
+            });
+
+            form.dispatchEvent(new Event("submit"));
+        });
+</script>
