@@ -165,15 +165,11 @@ namespace RakipBul.Controllers
             // Diğer diller için çeviri ve kayıt (boşsa direkt boş string kaydedilecek)
             var text = model.Text ?? string.Empty;
 
-            string enText = "";
-            string ruText = "";
-            string roText = "";
+            string enText = ""; 
 
             if (!string.IsNullOrWhiteSpace(text))
             {
                 enText = await _openAIManager.TranslateFromTurkishAsync(text, "English");
-                ruText = await _openAIManager.TranslateFromTurkishAsync(text, "Russian");
-                roText = await _openAIManager.TranslateFromTurkishAsync(text, "Romanian");
             }
 
             // İngilizce kayıt
@@ -189,45 +185,11 @@ namespace RakipBul.Controllers
                 Text = enText, // boş olabilir
                 EmbedVideoUrl = model.EmbedVideoUrl,
                 AltText = model.AltText,
-                Published = model.Published
+                Published = model.Published,
+				StartDate=model.StartDate,
+				EndDate=model.EndDate
             };
             _context.RichStaticContents.Add(enModel);
-
-            // Rusça kayıt
-            var ruModel = new RichStaticContent
-            {
-                CategoryId = model.CategoryId,
-                SeasonId = model.SeasonId,
-                MediaUrl = model.MediaUrl,
-                ProfileImageUrl = model.ProfileImageUrl,
-                CreatedAt = model.CreatedAt,
-                UpdatedAt = model.UpdatedAt,
-                Culture = "ru",
-                Text = ruText,
-                EmbedVideoUrl = model.EmbedVideoUrl,
-                AltText = model.AltText,
-                Published = model.Published
-            };
-            _context.RichStaticContents.Add(ruModel);
-
-            // Romence kayıt
-            var roModel = new RichStaticContent
-            {
-                CategoryId = model.CategoryId,
-                SeasonId = model.SeasonId,
-                MediaUrl = model.MediaUrl,
-                ProfileImageUrl = model.ProfileImageUrl,
-                CreatedAt = model.CreatedAt,
-                UpdatedAt = model.UpdatedAt,
-                Culture = "ro",
-                Text = roText,
-                EmbedVideoUrl = model.EmbedVideoUrl,
-                AltText = model.AltText,
-                Published = model.Published
-            };
-            _context.RichStaticContents.Add(roModel);
-
-
 
             await _context.SaveChangesAsync();
 			TempData["SuccessMessage"] = "Rich static içerik kaydedildi.";

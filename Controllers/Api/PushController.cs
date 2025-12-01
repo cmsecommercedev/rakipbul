@@ -23,14 +23,12 @@ namespace RakipBul.Controllers.Api
         }
 
         [HttpPost("send-everyone")]
-        public async Task<IActionResult> Send([FromBody] NotificationViewModel model,string culture)
+        public async Task<IActionResult> Send([FromBody] NotificationViewModel model)
         {
             if (!ModelState.IsValid)
-                return BadRequest(ModelState);
+                return BadRequest(ModelState); 
 
-            var topic = $"all_users_{culture}";
-
-            var result = await _notificationManager.SendNotificationToAllUsers(model,topic);
+            var result = await _notificationManager.SendNotificationToAllUsersBatch(model);
             if (result.success)
                 return Ok(new { success = true, message = result.message });
 
@@ -39,15 +37,14 @@ namespace RakipBul.Controllers.Api
         }
 
         [HttpPost("send-team")]
-        public async Task<IActionResult> SendTeam([FromBody] NotificationViewModel model,int teamid, string culture)
+        public async Task<IActionResult> SendTeam([FromBody] NotificationViewModel model,int teamid)
         {
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
-            string topic = $"team_{teamid}_{culture}";
+            string topic = $"team_{teamid}";
 
-
-            var result = await _notificationManager.SendNotificationToAllUsers(model, topic);
+            var result = await _notificationManager.SendNotificationToGroupBatch(model, topic);
             if (result.success)
                 return Ok(new { success = true, message = result.message });
 
@@ -56,14 +53,14 @@ namespace RakipBul.Controllers.Api
         }
 
         [HttpPost("send-player")]
-        public async Task<IActionResult> SendPlayer([FromBody] NotificationViewModel model, int playerid, string culture)
+        public async Task<IActionResult> SendPlayer([FromBody] NotificationViewModel model, int playerid)
         {
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
-            string topic = $"player_{playerid}_{culture}";
+            string topic = $"player_{playerid}";
 
-            var result = await _notificationManager.SendNotificationToAllUsers(model, topic);
+            var result = await _notificationManager.SendNotificationToGroupBatch(model, topic);
             if (result.success)
                 return Ok(new { success = true, message = result.message });
 

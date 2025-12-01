@@ -20,7 +20,10 @@ namespace RakipBul.Models
 		public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 		public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
-		public ICollection<StoryContent> Contents { get; set; } = new List<StoryContent>();
+        public DateTime StartDate { get; set; } = DateTime.UtcNow;
+        public DateTime EndDate { get; set; } = DateTime.UtcNow;
+
+        public ICollection<StoryContent> Contents { get; set; } = new List<StoryContent>();
 	}
 
 	public class StoryContent

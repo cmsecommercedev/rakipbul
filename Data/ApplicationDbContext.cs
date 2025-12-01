@@ -48,6 +48,10 @@ namespace RakipBul.Data
         public DbSet<PanoramaEntry> PanoramaEntries { get; set; }
 
         public DbSet<DeviceToken> DeviceTokens { get; set; }
+        public DbSet<UserDeviceToken> UserDeviceToken { get; set; }
+
+        public DbSet<DeviceTopicSubscription> DeviceTopicSubscriptions { get; set; }
+
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

@@ -34,7 +34,7 @@
 				</select>
 				<span asp-validation-for="CategoryId" class="text-sm text-red-400"></span>
 			</div>
-			<div class="md:col-span-2">
+			<div class="md:col-span-2" hidden="hidden">
 				<label class="block text-gray-300 mb-1">Culture</label>
 				<select asp-for="Culture"
 					class="w-full px-3 py-2 bg-gray-900 border border-gray-600 rounded-lg text-gray-200 focus:outline-none focus:border-yellow-500">
@@ -42,7 +42,7 @@
 				</select>
 			</div>
 
-			<div class="md:col-span-2">
+			<div class="md:col-span-2" hidden="hidden">
 				<label class="block text-gray-300 mb-1">Season (optional)</label>
 				<select asp-for="SeasonId"
 					class="w-full px-3 py-2 bg-gray-900 border border-gray-600 rounded-lg text-gray-200 focus:outline-none focus:border-yellow-500">
@@ -107,6 +107,24 @@
 					class="w-full px-3 py-2 bg-gray-900 border border-gray-600 rounded-lg text-gray-200 focus:outline-none focus:border-yellow-500" />
 			</div>
 
+			<div class="md:col-span-3">
+				<label class="block text-gray-300 mb-1">Start Date</label>
+				<input asp-for="StartDate"
+					   type="datetime-local"
+					   value="@(Model?.StartDate.ToLocalTime().ToString("yyyy-MM-ddTHH:mm"))"
+					   class="w-full px-3 py-2 bg-gray-900 border border-gray-600 rounded-lg text-gray-200
+                  focus:outline-none focus:border-yellow-500" />
+			</div>
+
+			<div class="md:col-span-3">
+				<label class="block text-gray-300 mb-1">End Date</label>
+				<input asp-for="EndDate"
+					   type="datetime-local"
+					   value="@(Model?.EndDate.ToLocalTime().ToString("yyyy-MM-ddTHH:mm"))"
+					   class="w-full px-3 py-2 bg-gray-900 border border-gray-600 rounded-lg text-gray-200
+                  focus:outline-none focus:border-yellow-500" />
+			</div>
+
 			<div class="md:col-span-2 flex items-end">
 				<label class="inline-flex items-center gap-2 text-gray-300">
 					<input asp-for="Published" type="checkbox"
@@ -150,9 +168,9 @@
 							<th class="px-6 py-3">Profile Image</th>
 							<th class="px-6 py-3">Video</th>
 							<th class="px-6 py-3">Text</th>
-							<th class="px-6 py-3">Alt</th>
-							<th class="px-6 py-3">Published</th>
-							<th class="px-6 py-3">Updated</th>
+							<th class="px-6 py-3">Start</th>
+							<th class="px-6 py-3">End</th>
+							<th class="px-6 py-3">Published</th> 
 							<th class="px-6 py-3 text-right">İşlem</th>
 						</tr>
 					</thead>
@@ -200,9 +218,9 @@
 								</td>
 								<td class="px-6 py-3 truncate max-w-[220px]">@x.EmbedVideoUrl</td>
 								<td class="px-6 py-3 whitespace-pre-line max-w-[420px]">@x.Text</td>
-								<td class="px-6 py-3 whitespace-pre-line max-w-[260px]">@x.AltText</td>
-								<td class="px-6 py-3">@(x.Published ? "Yes" : "No")</td>
-								<td class="px-6 py-3">@x.UpdatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+								<td class="px-6 py-3">@x.StartDate.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+								<td class="px-6 py-3">@x.EndDate.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+								<td class="px-6 py-3">@(x.Published ? "Yes" : "No")</td> 
 								<td class="px-6 py-3">
 									<div class="flex gap-2 justify-end">
 										<form asp-action="DeleteRichStatic" method="post"
@@ -222,6 +240,9 @@
 		</div>
 	}
 </div>
+
+
+
 @section Scripts {
 	<script>
 		function loadToForm(categoryId, culture, imageUrl, videoUrl, text, altText, published) {
