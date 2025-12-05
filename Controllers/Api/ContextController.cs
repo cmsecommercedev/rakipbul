@@ -303,5 +303,101 @@ namespace RakipBul.Controllers.Api // Namespace'i kontrol edin
             return Ok(panoramas);
         }
 
+        [HttpPost("video/stat")]
+        public async Task<IActionResult> UpdateVideoStat([FromBody] MobileVideoStatDto dto)
+        {
+            if (string.IsNullOrWhiteSpace(dto.VideoId) || string.IsNullOrWhiteSpace(dto.UserId))
+                return BadRequest(new { message = "VideoId ve UserId zorunludur." });
+
+            var stat = await _context.MobileVideoStats.FirstOrDefaultAsync(x => x.VideoId == dto.VideoId && x.UserId == dto.UserId);
+            if (stat == null)
+            {
+                stat = new MobileVideoStat
+                {
+                    VideoId = dto.VideoId,
+                    UserId = dto.UserId,
+                    LikeCount = dto.LikeCount,
+                    UnlikeCount = dto.UnlikeCount,
+                    ViewCount = dto.ViewCount
+                };
+                _context.MobileVideoStats.Add(stat);
+            }
+            else
+            {
+                stat.LikeCount = dto.LikeCount;
+                stat.UnlikeCount = dto.UnlikeCount;
+                stat.ViewCount = dto.ViewCount;
+                stat.UpdatedAt = DateTime.UtcNow;
+            }
+            await _context.SaveChangesAsync();
+            // Toplam istatistikler
+            var totalStats = await _context.MobileVideoStats
+                .Where(x => x.VideoId == dto.VideoId)
+                .GroupBy(x => x.VideoId)
+                .Select(g => new {
+                    TotalViews = g.Sum(s => s.ViewCount),
+                    TotalLikes = g.Sum(s => s.LikeCount),
+                    TotalUnlikes = g.Sum(s => s.UnlikeCount)
+                })
+                .FirstOrDefaultAsync();
+            return Ok(new {
+                stat.VideoId,
+                stat.UserId,
+                stat.LikeCount,
+                stat.UnlikeCount,
+                stat.ViewCount,
+                TotalViews = totalStats?.TotalViews ?? stat.ViewCount,
+                TotalLikes = totalStats?.TotalLikes ?? stat.LikeCount,
+                TotalUnlikes = totalStats?.TotalUnlikes ?? stat.UnlikeCount
+            });
+        }
+
+        [HttpGet("video/stat")]
+        public async Task<IActionResult> GetVideoStat([FromQuery] string videoId, [FromQuery] string userId)
+        {
+            if (string.IsNullOrWhiteSpace(videoId) || string.IsNullOrWhiteSpace(userId))
+                return BadRequest(new { message = "VideoId ve UserId zorunludur." });
+
+            var stat = await _context.MobileVideoStats.FirstOrDefaultAsync(x => x.VideoId == videoId && x.UserId == userId);
+            if (stat == null)
+            {
+                stat = new MobileVideoStat
+                {
+                    VideoId = videoId,
+                    UserId = userId,
+                    LikeCount = 0,
+                    UnlikeCount = 0,
+                    ViewCount = 1 // İlk load'da izlenme 1
+                };
+                _context.MobileVideoStats.Add(stat);
+                await _context.SaveChangesAsync();
+            }
+            else
+            {
+                stat.ViewCount++;
+                stat.UpdatedAt = DateTime.UtcNow;
+                await _context.SaveChangesAsync();
+            }
+            // Toplam istatistikler
+            var totalStats = await _context.MobileVideoStats
+                .Where(x => x.VideoId == videoId)
+                .GroupBy(x => x.VideoId)
+                .Select(g => new {
+                    TotalViews = g.Sum(s => s.ViewCount),
+                    TotalLikes = g.Sum(s => s.LikeCount),
+                    TotalUnlikes = g.Sum(s => s.UnlikeCount)
+                })
+                .FirstOrDefaultAsync();
+            return Ok(new {
+                stat.VideoId,
+                stat.UserId,
+                stat.LikeCount,
+                stat.UnlikeCount,
+                stat.ViewCount,
+                TotalViews = totalStats?.TotalViews ?? stat.ViewCount,
+                TotalLikes = totalStats?.TotalLikes ?? stat.LikeCount,
+                TotalUnlikes = totalStats?.TotalUnlikes ?? stat.UnlikeCount
+            });
+        }
     }
 }

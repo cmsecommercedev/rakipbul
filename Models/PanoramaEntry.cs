@@ -13,6 +13,11 @@
 
         public string? YoutubeEmbedLink { get; set; }
 
+        /// <summary>
+        /// Videonun toplam izlenme sayısı.
+        /// </summary>
+        public int ViewCount { get; set; }
+
         // Player Info
         public int? PlayerId { get; set; }
         public int? SeasonId { get; set; }

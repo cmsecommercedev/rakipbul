@@ -46,6 +46,9 @@ namespace RakipBul.Data
         public DbSet<Story> Stories { get; set; }
         public DbSet<StoryContent> StoryContents { get; set; }
         public DbSet<PanoramaEntry> PanoramaEntries { get; set; }
+        public DbSet<VideoLike> VideoLikes { get; set; }
+        public DbSet<VideoStat> VideoStats { get; set; }
+        public DbSet<MobileVideoStat> MobileVideoStats { get; set; }
 
         public DbSet<DeviceToken> DeviceTokens { get; set; }
         public DbSet<UserDeviceToken> UserDeviceToken { get; set; }
@@ -297,6 +300,17 @@ namespace RakipBul.Data
                     .WithMany(s => s.Contents)
                     .HasForeignKey(sc => sc.StoryId)
                     .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // Harici videolar için indeksler
+            modelBuilder.Entity<VideoStat>(entity =>
+            {
+                entity.HasIndex(x => x.VideoId).IsUnique();
+            });
+
+            modelBuilder.Entity<VideoLike>(entity =>
+            {
+                entity.HasIndex(x => new { x.VideoId, x.UserId }).IsUnique();
             });
 
             // RichStaticContent relationships
