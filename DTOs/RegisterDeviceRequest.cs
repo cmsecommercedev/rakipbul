@@ -2,7 +2,7 @@
 {
     public class RegisterDeviceRequest
     {
-        public int UserId { get; set; }
+        public string MacId { get; set; }
 
         public string DeviceToken { get; set; } = null!;
 

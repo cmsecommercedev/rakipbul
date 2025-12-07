@@ -43,12 +43,12 @@ namespace RakipBul.Controllers.Api // Namespace'i kontrol edin
         {
             try
             {
-                if (req.UserId <= 0 || string.IsNullOrWhiteSpace(req.DeviceToken))
+                if (string.IsNullOrWhiteSpace(req.MacId) || string.IsNullOrWhiteSpace(req.DeviceToken))
                     return BadRequest("Geçersiz kullanıcı veya device token."); 
 
                 // Veri var mı?
                 var existing = await _context.UserDeviceToken
-                    .FirstOrDefaultAsync(x => x.UserId == req.UserId && x.Token == req.DeviceToken);
+                    .FirstOrDefaultAsync(x => x.MacId == req.MacId && x.Token == req.DeviceToken);
 
                 if (existing != null)
                 {
@@ -64,7 +64,7 @@ namespace RakipBul.Controllers.Api // Namespace'i kontrol edin
                 // Yeni kayıt oluştur
                 var device = new UserDeviceToken
                 {
-                    UserId = req.UserId,
+                    MacId = req.MacId,
                     Token = req.DeviceToken,
                     Culture = req.Culture,
                     UpdatedAt = DateTime.UtcNow
