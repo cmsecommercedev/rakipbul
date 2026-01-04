@@ -123,8 +123,9 @@ builder.Services.AddSwaggerGen(c =>
 
 builder.Services.Configure<FormOptions>(options =>
 {
-    options.MultipartBodyLengthLimit = 500 * 1024 * 1024; // 100 MB
+    options.MultipartBodyLengthLimit = 500 * 1024 * 1024; // 500 MB
 });
+
 
 builder.Services.AddMemoryCache();
 builder.Services.AddDistributedMemoryCache(); // veya Redis için: AddStackExchangeRedisCache
