@@ -1,10 +1,3 @@
-using RakipBul;
-using RakipBul.CloudflareManager;
-using RakipBul.Data;
-using RakipBul.Jobs;
-using RakipBul.Managers;
-using RakipBul.Models;
-using RakipBul.Models.UserPlayerTypes;
 using Hangfire;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Features;
@@ -16,6 +9,15 @@ using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using Rakipbul.Services;
+using Rakipbul.Services.IServices;
+using RakipBul;
+using RakipBul.CloudflareManager;
+using RakipBul.Data;
+using RakipBul.Jobs;
+using RakipBul.Managers;
+using RakipBul.Models;
+using RakipBul.Models.UserPlayerTypes;
 using System;
 using System.Text;
 
@@ -42,6 +44,11 @@ builder.Services.AddScoped<LeagueManager>();
 
 builder.Services.AddScoped<NotificationManager>();
 builder.Services.AddTransient<DbBackupJob>();
+builder.Services.Configure<RakipbulApiSettings>(
+    builder.Configuration.GetSection("RakipbulApi"));
+
+builder.Services.AddSingleton<RakipbulApiManager>();
+builder.Services.AddScoped<IPanoramaService, PanoramaService>();
 
 // DbContext
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
@@ -116,8 +123,9 @@ builder.Services.AddSwaggerGen(c =>
 
 builder.Services.Configure<FormOptions>(options =>
 {
-    options.MultipartBodyLengthLimit = 500 * 1024 * 1024; // 100 MB
+    options.MultipartBodyLengthLimit = 500 * 1024 * 1024; // 500 MB
 });
+
 
 builder.Services.AddMemoryCache();
 builder.Services.AddDistributedMemoryCache(); // veya Redis için: AddStackExchangeRedisCache

@@ -1,19 +1,21 @@
-using RakipBul.Data;
-using RakipBul.Models;
-using RakipBul.Models.Dtos; // Eklediğimiz DTO'lar için
-using RakipBul.Managers;    // NotificationManager için
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Caching.Memory; // IMemoryCache için
 using Microsoft.Extensions.Caching.Distributed; // IDistributedCache için (Opsiyonel ama iyi pratik)
+using Microsoft.Extensions.Caching.Memory; // IMemoryCache için
+using Microsoft.Extensions.Logging;
+using Rakipbul.DTOs;
+using Rakipbul.Models;
+using RakipBul.Attributes; // Kullanıcının kimliğini almak için (opsiyonel)
+using RakipBul.Data;
+using RakipBul.Dtos;
+using RakipBul.Managers;    // NotificationManager için
+using RakipBul.Models;
+using RakipBul.Models.Dtos; // Eklediğimiz DTO'lar için
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading.Tasks;
 using System.Security.Claims;
-using RakipBul.Dtos;
-using RakipBul.Attributes; // Kullanıcının kimliğini almak için (opsiyonel)
+using System.Threading.Tasks;
 
 namespace RakipBul.Controllers.Api // Namespace'i kontrol edin
 {
@@ -35,53 +37,82 @@ namespace RakipBul.Controllers.Api // Namespace'i kontrol edin
             _notificationManager = notificationManager;
         }
 
-        [HttpPost("addusertoall")]
-        public async Task<IActionResult> AddUserToAll([FromQuery] string userToken, string culture = "tr")
+
+        [HttpPost("register-device")]
+        public async Task<IActionResult> RegisterDevice([FromBody] RegisterDeviceRequest req)
         {
-            if (string.IsNullOrWhiteSpace(userToken))
-                return BadRequest("Geçersiz macid veya kullanıcı token bilgisi.");
+            try
+            {
+                if (string.IsNullOrWhiteSpace(req.MacId) || string.IsNullOrWhiteSpace(req.DeviceToken))
+                    return BadRequest("Geçersiz kullanıcı veya device token."); 
 
+                // Veri var mı?
+                var existing = await _context.UserDeviceToken
+                    .FirstOrDefaultAsync(x => x.MacId == req.MacId && x.Token == req.DeviceToken);
 
-            var result = await _notificationManager.SubscribeToTopicAsync(new[] { userToken }, $"all_users_{culture}");
+                if (existing != null)
+                {
+                    // Güncelle
+                    existing.Culture = req.Culture;
+                    existing.UpdatedAt = DateTime.UtcNow;
 
-            if (result.success)
-                return Ok(new { success = true, message = $"Kullanıcı başarıyla eklendi" });
-            else
-                return StatusCode(500, new { success = false, message = $"Hata: {result.message}" });
-        }
+                    await _context.SaveChangesAsync();
+
+                    return Ok(new { success = true, message = "Device token güncellendi." });
+                }
+
+                // Yeni kayıt oluştur
+                var device = new UserDeviceToken
+                {
+                    MacId = req.MacId,
+                    Token = req.DeviceToken,
+                    Culture = req.Culture,
+                    UpdatedAt = DateTime.UtcNow
+                };
+
+                _context.UserDeviceToken.Add(device);
+                await _context.SaveChangesAsync();
+
+                return Ok(new { success = true, message = "Device başarıyla kaydedildi." });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Device kaydedilirken hata oluştu.");
+                return StatusCode(500, "Sunucu hatası");
+            }
+        } 
+
         [HttpPost("addteamtofav")]
-        public async Task<IActionResult> AddTeamToFav([FromQuery] int teamId, [FromQuery] string userToken, string MacID, string culture = "tr")
+        public async Task<IActionResult> AddTeamToFav(int teamId, string userToken, string MacID)
         {
-            // Zaten favori mi kontrol et
-            bool alreadyExists = await _context.FavouriteTeams
+            if (teamId <= 0 || string.IsNullOrWhiteSpace(userToken))
+                return BadRequest("Geçersiz veri.");
+
+            bool exists = await _context.FavouriteTeams
                 .AnyAsync(f => f.TeamID == teamId && f.UserToken == userToken);
 
-            if (alreadyExists)
-                return Ok(new { success = true, message = "Bu takım zaten favorilerde." });
+            if (exists)
+                return Ok(new { success = true, message = "Zaten favorilerde." });
 
-            // Tabloya ekle
-            var fav = new FavouriteTeams
+            _context.FavouriteTeams.Add(new FavouriteTeams
             {
                 TeamID = teamId,
                 UserToken = userToken,
-                MacID = MacID,
-                Culture = culture
-            };
-            _context.FavouriteTeams.Add(fav);
+                MacID = MacID
+            });
+
             await _context.SaveChangesAsync();
 
-            // Firebase topic abone et
-            string topic = $"team_{teamId}_{culture}";
-            var result = await _notificationManager.SubscribeToTopicAsync(new[] { userToken }, topic);
+            string topic = $"team_{teamId}";
 
-            if (result.success)
-                return Ok(new { success = true, message = $"Takım favorilere eklendi ve topic'e abone olundu: {topic}" });
-            else
-                return StatusCode(500, new { success = false, message = $"Favorilere eklendi fakat topic abonesi yapılamadı: {result.message}" });
+            await _notificationManager.SubscribeToTopicAsync(userToken, topic);
+
+            return Ok(new { success = true, message = "Favorilere eklendi." });
         }
 
+
         [HttpPost("removeteamfromfav")]
-        public async Task<IActionResult> RemoveTeamFromFav([FromQuery] int teamId, [FromQuery] string userToken, string MacID, string culture = "tr")
+        public async Task<IActionResult> RemoveTeamFromFav([FromQuery] int teamId, [FromQuery] string userToken, string MacID)
         {
             if (teamId <= 0 || string.IsNullOrWhiteSpace(userToken))
                 return BadRequest("Geçersiz takım veya kullanıcı token bilgisi.");
@@ -95,12 +126,14 @@ namespace RakipBul.Controllers.Api // Namespace'i kontrol edin
 
             // Tablo kaydını sil
             _context.FavouriteTeams.Remove(fav);
+
             await _context.SaveChangesAsync();
 
             // Firebase topic'ten çıkar - kaydedilen culture'ı kullan
-            var topicCulture = string.IsNullOrWhiteSpace(fav.Culture) ? culture : fav.Culture;
-            string topic = $"team_{teamId}_{topicCulture}";
-            var result = await _notificationManager.UnsubscribeFromTopicAsync(new[] { userToken }, topic);
+
+            string topic = $"team_{teamId}";
+
+            var result = await _notificationManager.UnsubscribeFromTopicAsync(userToken, topic);
 
             if (result.success)
                 return Ok(new { success = true, message = $"Takım favorilerden çıkarıldı ve topic'ten çıkıldı: {topic}" });
@@ -108,21 +141,8 @@ namespace RakipBul.Controllers.Api // Namespace'i kontrol edin
                 return StatusCode(500, new { success = false, message = $"Favorilerden çıkarıldı fakat topic'ten çıkılamadı: {result.message}" });
         }
 
-
-        [HttpGet("isteamfav")]
-        public async Task<IActionResult> IsTeamFav([FromQuery] int teamId, [FromQuery] string macId)
-        {
-            if (teamId <= 0 || string.IsNullOrWhiteSpace(macId))
-                return BadRequest("Geçersiz takım veya cihaz bilgisi.");
-
-            bool isFav = await _context.FavouriteTeams
-                .AnyAsync(f => f.TeamID == teamId && f.MacID == macId);
-
-            return Ok(new { isFavourite = isFav });
-        }
-
         [HttpPost("addplayertofav")]
-        public async Task<IActionResult> AddPlayerToFav([FromQuery] int playerId, [FromQuery] string userToken, string MacID, string culture = "tr")
+        public async Task<IActionResult> AddPlayerToFav([FromQuery] int playerId, [FromQuery] string userToken, string MacID)
         {
             // Zaten favori mi kontrol et
             bool alreadyExists = await _context.FavouritePlayers
@@ -136,15 +156,15 @@ namespace RakipBul.Controllers.Api // Namespace'i kontrol edin
             {
                 PlayerID = playerId,
                 UserToken = userToken,
-                MacID = MacID,
-                Culture = culture
+                MacID = MacID
             };
             _context.FavouritePlayers.Add(fav);
             await _context.SaveChangesAsync();
 
             // Firebase topic abone et
-            string topic = $"player_{playerId}_{culture}";
-            var result = await _notificationManager.SubscribeToTopicAsync(new[] { userToken }, topic);
+            string topic = $"player_{playerId}";
+
+            var result = await _notificationManager.SubscribeToTopicAsync(userToken, topic);
 
             if (result.success)
                 return Ok(new { success = true, message = $"Oyuncu favorilere eklendi ve topic'e abone olundu: {topic}" });
@@ -153,7 +173,7 @@ namespace RakipBul.Controllers.Api // Namespace'i kontrol edin
         }
 
         [HttpPost("removeplayerfromfav")]
-        public async Task<IActionResult> RemovePlayerFromFav([FromQuery] int playerId, [FromQuery] string userToken, string MacID, string culture = "tr")
+        public async Task<IActionResult> RemovePlayerFromFav([FromQuery] int playerId, [FromQuery] string userToken, string MacID)
         {
             if (playerId <= 0 || string.IsNullOrWhiteSpace(userToken))
                 return BadRequest("Geçersiz oyuncu veya kullanıcı token bilgisi.");
@@ -167,12 +187,12 @@ namespace RakipBul.Controllers.Api // Namespace'i kontrol edin
 
             // Tablo kaydını sil
             _context.FavouritePlayers.Remove(fav);
+
             await _context.SaveChangesAsync();
 
-            // Firebase topic'ten çıkar - kaydedilen culture'ı kullan
-            var topicCulture = string.IsNullOrWhiteSpace(fav.Culture) ? culture : fav.Culture;
-            string topic = $"player_{playerId}_{topicCulture}";
-            var result = await _notificationManager.UnsubscribeFromTopicAsync(new[] { userToken }, topic);
+            string topic = $"player_{playerId}";
+
+            var result = await _notificationManager.UnsubscribeFromTopicAsync(userToken, topic);
 
             if (result.success)
                 return Ok(new { success = true, message = $"Oyuncu favorilerden çıkarıldı ve topic'ten çıkıldı: {topic}" });
@@ -186,8 +206,18 @@ namespace RakipBul.Controllers.Api // Namespace'i kontrol edin
             if (playerId <= 0 || string.IsNullOrWhiteSpace(macId))
                 return BadRequest("Geçersiz oyuncu veya cihaz bilgisi.");
 
-            bool isFav = await _context.FavouritePlayers
-                .AnyAsync(f => f.PlayerID == playerId && f.MacID == macId);
+            bool isFav = await _context.FavouritePlayers.AnyAsync(f => f.PlayerID == playerId && f.MacID == macId);
+
+            return Ok(new { isFavourite = isFav });
+        }
+
+        [HttpGet("isteamfav")]
+        public async Task<IActionResult> IsTeamFav([FromQuery] int teamId, [FromQuery] string macId)
+        {
+            if (teamId <= 0 || string.IsNullOrWhiteSpace(macId))
+                return BadRequest("Geçersiz takım veya cihaz bilgisi.");
+
+            bool isFav = await _context.FavouriteTeams.AnyAsync(f => f.TeamID == teamId && f.MacID == macId);
 
             return Ok(new { isFavourite = isFav });
         }

@@ -22,15 +22,13 @@ namespace RakipBul.Controllers.Api
             _logger = logger;
         }
 
-        [HttpPost("send")]
+        [HttpPost("send-everyone")]
         public async Task<IActionResult> Send([FromBody] NotificationViewModel model)
         {
             if (!ModelState.IsValid)
-                return BadRequest(ModelState);
+                return BadRequest(ModelState); 
 
-            var topic = $"all_users";
-
-            var result = await _notificationManager.SendNotificationToAllUsers(model,topic);
+            var result = await _notificationManager.SendNotificationToAllUsersBatch(model);
             if (result.success)
                 return Ok(new { success = true, message = result.message });
 
@@ -38,7 +36,7 @@ namespace RakipBul.Controllers.Api
             return StatusCode(500, new { success = false, message = result.message });
         }
 
-        [HttpPost("sendteam")]
+        [HttpPost("send-team")]
         public async Task<IActionResult> SendTeam([FromBody] NotificationViewModel model,int teamid)
         {
             if (!ModelState.IsValid)
@@ -46,8 +44,7 @@ namespace RakipBul.Controllers.Api
 
             string topic = $"team_{teamid}";
 
-
-            var result = await _notificationManager.SendNotificationToAllUsers(model, topic);
+            var result = await _notificationManager.SendNotificationToGroupBatch(model, topic);
             if (result.success)
                 return Ok(new { success = true, message = result.message });
 
@@ -55,7 +52,7 @@ namespace RakipBul.Controllers.Api
             return StatusCode(500, new { success = false, message = result.message });
         }
 
-        [HttpPost("sendplayer")]
+        [HttpPost("send-player")]
         public async Task<IActionResult> SendPlayer([FromBody] NotificationViewModel model, int playerid)
         {
             if (!ModelState.IsValid)
@@ -63,7 +60,7 @@ namespace RakipBul.Controllers.Api
 
             string topic = $"player_{playerid}";
 
-            var result = await _notificationManager.SendNotificationToAllUsers(model, topic);
+            var result = await _notificationManager.SendNotificationToGroupBatch(model, topic);
             if (result.success)
                 return Ok(new { success = true, message = result.message });
 

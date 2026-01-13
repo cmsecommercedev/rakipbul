@@ -17,7 +17,10 @@ namespace RakipBul.Models
 		public string? AltText { get; set; } // image alt text
 		public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 		public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
-		public bool Published { get; set; } = true;
+
+        public DateTime StartDate { get; set; } = DateTime.UtcNow;
+        public DateTime EndDate { get; set; } = DateTime.UtcNow;
+        public bool Published { get; set; } = true;
 
 		[NotMapped]
 		public IFormFile? MediaFile { get; set; } // upload (optional)

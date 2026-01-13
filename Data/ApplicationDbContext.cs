@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using RakipBul.Models;
+using Rakipbul.Models;
 
 namespace RakipBul.Data
 {
@@ -37,13 +38,21 @@ namespace RakipBul.Data
         public DbSet<MatchSquadSubstitution> MatchSquadSubstitutions { get; set; }
         public DbSet<LeagueRule> LeagueRules { get; set; }
         public DbSet<CityRestriction> CityRestrictions { get; set; }
-      		public DbSet<LeagueRankingStatus> LeagueRankingStatus { get; set; }
-		public DbSet<PhotoGallery> PhotoGalleries { get; set; }
-		public DbSet<StaticKeyValue> StaticKeyValues { get; set; }
-        		public DbSet<RichStaticContent> RichStaticContents { get; set; }
-		public DbSet<RichContentCategory> RichContentCategories { get; set; }
+        public DbSet<LeagueRankingStatus> LeagueRankingStatus { get; set; }
+        public DbSet<PhotoGallery> PhotoGalleries { get; set; }
+        public DbSet<StaticKeyValue> StaticKeyValues { get; set; }
+        public DbSet<RichStaticContent> RichStaticContents { get; set; }
+        public DbSet<RichContentCategory> RichContentCategories { get; set; }
         public DbSet<Story> Stories { get; set; }
         public DbSet<StoryContent> StoryContents { get; set; }
+        public DbSet<PanoramaEntry> PanoramaEntries { get; set; }
+        public DbSet<VideoTotalView> VideoTotalView { get; set; } 
+        public DbSet<MobileVideoStat> MobileVideoStats { get; set; }
+
+        public DbSet<DeviceToken> DeviceTokens { get; set; }
+        public DbSet<UserDeviceToken> UserDeviceToken { get; set; }
+
+        public DbSet<DeviceTopicSubscription> DeviceTopicSubscriptions { get; set; }
 
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -272,51 +281,52 @@ namespace RakipBul.Data
                 entity.Property(p => p.UploadedAt).HasDefaultValueSql("GETUTCDATE()");
             });
 
-			modelBuilder.Entity<Story>(entity =>
-			{
-				entity.Property(s => s.Title).IsRequired().HasMaxLength(200);
-				entity.Property(s => s.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
-				entity.Property(s => s.UpdatedAt).HasDefaultValueSql("GETUTCDATE()");
-			});
+            modelBuilder.Entity<Story>(entity =>
+            {
+                entity.Property(s => s.Title).IsRequired().HasMaxLength(200);
+                entity.Property(s => s.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+                entity.Property(s => s.UpdatedAt).HasDefaultValueSql("GETUTCDATE()");
+            });
 
-			modelBuilder.Entity<StoryContent>(entity =>
-			{
-				entity.Property(sc => sc.MediaUrl).IsRequired().HasMaxLength(500);
-				entity.Property(sc => sc.ContentType).HasMaxLength(100);
-				entity.Property(sc => sc.DisplayOrder).HasDefaultValue(0);
-				entity.Property(sc => sc.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
-				entity
-					.HasOne(sc => sc.Story)
-					.WithMany(s => s.Contents)
-					.HasForeignKey(sc => sc.StoryId)
-					.OnDelete(DeleteBehavior.Cascade);
-			});
+            modelBuilder.Entity<StoryContent>(entity =>
+            {
+                entity.Property(sc => sc.MediaUrl).IsRequired().HasMaxLength(500);
+                entity.Property(sc => sc.ContentType).HasMaxLength(100);
+                entity.Property(sc => sc.DisplayOrder).HasDefaultValue(0);
+                entity.Property(sc => sc.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+                entity
+                    .HasOne(sc => sc.Story)
+                    .WithMany(s => s.Contents)
+                    .HasForeignKey(sc => sc.StoryId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+             
 
-			// RichStaticContent relationships
-			modelBuilder.Entity<RichStaticContent>(entity =>
-			{
-				entity
-					.HasOne(rsc => rsc.Category)
-					.WithMany(c => c.RichStaticContents)
-					.HasForeignKey(rsc => rsc.CategoryId)
-					.OnDelete(DeleteBehavior.SetNull);
-					
-				entity
-					.HasOne(rsc => rsc.Season)
-					.WithMany()
-					.HasForeignKey(rsc => rsc.SeasonId)
-					.OnDelete(DeleteBehavior.SetNull);
-			});
+            // RichStaticContent relationships
+            modelBuilder.Entity<RichStaticContent>(entity =>
+            {
+                entity
+                    .HasOne(rsc => rsc.Category)
+                    .WithMany(c => c.RichStaticContents)
+                    .HasForeignKey(rsc => rsc.CategoryId)
+                    .OnDelete(DeleteBehavior.SetNull);
 
-			// RichContentCategory configuration
-			modelBuilder.Entity<RichContentCategory>(entity =>
-			{
-				entity.Property(rc => rc.Name).IsRequired().HasMaxLength(100);
-				entity.Property(rc => rc.Code).HasMaxLength(50);
-				entity.Property(rc => rc.Description).HasMaxLength(500);
-				entity.Property(rc => rc.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
-				entity.Property(rc => rc.UpdatedAt).HasDefaultValueSql("GETUTCDATE()");
-			});
+                entity
+                    .HasOne(rsc => rsc.Season)
+                    .WithMany()
+                    .HasForeignKey(rsc => rsc.SeasonId)
+                    .OnDelete(DeleteBehavior.SetNull);
+            });
+
+            // RichContentCategory configuration
+            modelBuilder.Entity<RichContentCategory>(entity =>
+            {
+                entity.Property(rc => rc.Name).IsRequired().HasMaxLength(100);
+                entity.Property(rc => rc.Code).HasMaxLength(50);
+                entity.Property(rc => rc.Description).HasMaxLength(500);
+                entity.Property(rc => rc.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+                entity.Property(rc => rc.UpdatedAt).HasDefaultValueSql("GETUTCDATE()");
+            });
         }
     }
 }

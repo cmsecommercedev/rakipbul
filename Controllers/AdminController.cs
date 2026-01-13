@@ -1374,30 +1374,30 @@ namespace RakipBul.Controllers
                 MessageTr = dto.Detail
             };
 
-            var (success, message) = await _notificationManager.SendNotificationToAllUsers(notification,"all_users");
+            var (success, message) = await _notificationManager.SendNotificationToAllUsersBatch(notification);
             if (success)
                 return Ok(new { message });
             return StatusCode(500, message);
         }
 
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> SendTeamPush([FromBody] PushTeamDto dto)
-        {
-            if (dto.TeamId <= 0 || string.IsNullOrWhiteSpace(dto.Title) || string.IsNullOrWhiteSpace(dto.Detail))
-                return BadRequest("Takım, başlık ve detay zorunludur.");
+        //[HttpPost]
+        //[ValidateAntiForgeryToken]
+        //public async Task<IActionResult> SendTeamPush([FromBody] PushTeamDto dto)
+        //{
+        //    if (dto.TeamId <= 0 || string.IsNullOrWhiteSpace(dto.Title) || string.IsNullOrWhiteSpace(dto.Detail))
+        //        return BadRequest("Takım, başlık ve detay zorunludur.");
 
-            var notification = new NotificationViewModel
-            {
-                TitleTr = dto.Title,
-                MessageTr = dto.Detail
-            };
+        //    var notification = new NotificationViewModel
+        //    {
+        //        TitleTr = dto.Title,
+        //        MessageTr = dto.Detail
+        //    };
 
-            var (success, message) = await _notificationManager.SendNotificationToGroup($"team_{dto.TeamId}", notification);
-            if (success)
-                return Ok(new { message });
-            return StatusCode(500, message);
-        }
+        //    var (success, message) = await _notificationManager.SendNotificationToGroup($"team_{dto.TeamId}", notification);
+        //    if (success)
+        //        return Ok(new { message });
+        //    return StatusCode(500, message);
+        //}
 
 
         [HttpPost]
@@ -1633,25 +1633,25 @@ namespace RakipBul.Controllers
 
                 await _context.SaveChangesAsync();
 
-                // Bildirim gönder
-                if (homeScoreChanged)
-                {
-                    var notification = new NotificationViewModel
-                    {
-                        TitleTr = $"{match.HomeTeam.Name} Golü!!!!",
-                        MessageTr = $"Skor: {match.HomeTeam.Name} {homeScore} - {match.AwayTeam.Name} {awayScore}"
-                    };
-                    await _notificationManager.SendNotificationToGroup($"team_{match.HomeTeam.TeamID}", notification);
-                }
-                if (awayScoreChanged)
-                {
-                    var notification = new NotificationViewModel
-                    {
-                        TitleTr = $"{match.AwayTeam.Name} Golü!!!",
-                        MessageTr = $"Skor: {match.HomeTeam.Name} {homeScore} - {match.AwayTeam.Name} {awayScore}"
-                    };
-                    await _notificationManager.SendNotificationToGroup($"team_{match.AwayTeam.TeamID}", notification);
-                }
+                //// Bildirim gönder
+                //if (homeScoreChanged)
+                //{
+                //    var notification = new NotificationViewModel
+                //    {
+                //        TitleTr = $"{match.HomeTeam.Name} Golü!!!!",
+                //        MessageTr = $"Skor: {match.HomeTeam.Name} {homeScore} - {match.AwayTeam.Name} {awayScore}"
+                //    };
+                //    await _notificationManager.SendNotificationToGroup($"team_{match.HomeTeam.TeamID}", notification);
+                //}
+                //if (awayScoreChanged)
+                //{
+                //    var notification = new NotificationViewModel
+                //    {
+                //        TitleTr = $"{match.AwayTeam.Name} Golü!!!",
+                //        MessageTr = $"Skor: {match.HomeTeam.Name} {homeScore} - {match.AwayTeam.Name} {awayScore}"
+                //    };
+                //    await _notificationManager.SendNotificationToGroup($"team_{match.AwayTeam.TeamID}", notification);
+                //}
 
                 return Json(new { success = true });
             }

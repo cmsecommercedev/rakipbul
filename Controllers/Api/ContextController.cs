@@ -1,15 +1,18 @@
-using RakipBul.Data;
-using RakipBul.Models.Dtos;// NotificationManager için
+using DocumentFormat.OpenXml.Presentation;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
+using Rakipbul.DTOs;
+using Rakipbul.Models;
 using RakipBul.Attributes; // Kullanıcının kimliğini almak için (opsiyonel)
-using System;
+using RakipBul.Data;
 using RakipBul.Models;
+using RakipBul.Models.Dtos;// NotificationManager için
+using System;
 
 namespace RakipBul.Controllers.Api // Namespace'i kontrol edin
 {
-    [ApiKeyAuth]
+    //[ApiKeyAuth]
     [Route("api/[controller]")]
     [ApiController]
     public class ContextController : ControllerBase
@@ -218,9 +221,9 @@ namespace RakipBul.Controllers.Api // Namespace'i kontrol edin
 
         [HttpGet("app-settings")]
         public async Task<ActionResult<Settings>> GetAppSettings()
-        { 
+        {
             try
-            { 
+            {
                 var settings = await _context.Settings
                     .OrderByDescending(s => s.LastUpdated)
                     .FirstOrDefaultAsync();
@@ -239,5 +242,339 @@ namespace RakipBul.Controllers.Api // Namespace'i kontrol edin
                 return StatusCode(500, new { error = "Uygulama ayarları yüklenirken bir hata oluştu" });
             }
         }
+
+        [HttpGet("panorama/today")]
+        public async Task<ActionResult<IEnumerable<PanoramaDto>>> GetTodayPanoramaEntries([FromQuery] int leagueId, [FromQuery] int seasonId, [FromQuery] PanoramaCategory category)
+        {
+            if (leagueId <= 0)
+                return BadRequest(new { message = "Geçerli bir LeagueId gönderilmelidir." });
+
+            if (seasonId <= 0)
+                return BadRequest(new { message = "Geçerli bir SeasonId gönderilmelidir." });
+
+            if (!Enum.IsDefined(typeof(PanoramaCategory), category))
+                return BadRequest(new { message = "Geçersiz kategori. (1=Panorama, 2=Goals)" });
+
+            var today = DateTime.UtcNow.Date;
+
+            var panoramas = await _context.PanoramaEntries
+                .AsNoTracking()
+                .Where(p =>
+                    p.LeagueId == leagueId &&
+                    p.SeasonId == seasonId &&
+                    p.Category == category &&     // ✔ kategori filtresi
+                    p.StartDate <= today &&
+                    p.EndDate >= today
+                )
+                .Select(p => new PanoramaDto
+                {
+                    Id = p.Id,
+                    Title = p.Title,
+                    StartDate = p.StartDate,
+                    EndDate = p.EndDate,
+                    YoutubeEmbedLink = p.YoutubeEmbedLink,
+
+                    PlayerId = p.PlayerId,
+                    PlayerName = p.PlayerName,
+                    PlayerImageUrl = p.PlayerImageUrl,
+                    PlayerPosition = p.PlayerPosition,
+
+                    TeamId = p.TeamId,
+                    TeamName = p.TeamName,
+                    TeamImageUrl = p.TeamImageUrl,
+
+                    LeagueId = p.LeagueId,
+                    LeagueName = p.LeagueName,
+                    ProvinceName = p.ProvinceName,
+
+                    CreatedAt = p.CreatedAt
+                })
+                .ToListAsync();
+
+            if (!panoramas.Any())
+            {
+                return NotFound(new
+                {
+                    message = "Bu lig, sezon ve kategori için bugünün tarih aralığında kayıt bulunamadı."
+                });
+            }
+
+            return Ok(panoramas);
+        }
+
+
+        [HttpPost("video-stat")]
+        public async Task<IActionResult> UpdateVideoStat([FromBody] MobileVideoStatDto dto)
+        {
+            if (string.IsNullOrWhiteSpace(dto.VideoId) || string.IsNullOrWhiteSpace(dto.UserId))
+                return BadRequest(new { message = "VideoId ve UserId zorunludur." });
+
+            // Kullanıcı bazlı istatistik
+            var stat = await _context.MobileVideoStats
+                .FirstOrDefaultAsync(x => x.VideoId == dto.VideoId && x.UserId == dto.UserId);
+
+            if (stat == null)
+            {
+                stat = new MobileVideoStat
+                {
+                    VideoId = dto.VideoId,
+                    UserId = dto.UserId,
+                    LikeCount = dto.Like ? 1 : 0,
+                    UnlikeCount = dto.Unlike ? 1 : 0,
+                    ViewCount = 1
+                };
+                _context.MobileVideoStats.Add(stat);
+            }
+            else
+            {
+                // Like geldiyse Unlike sıfırlanacak
+                if (dto.Like)
+                {
+                    stat.LikeCount = 1;
+                    stat.UnlikeCount = 0;
+                }
+                // Unlike geldiyse Like sıfırlanacak
+                else if (dto.Unlike)
+                {
+                    stat.LikeCount = 0;
+                    stat.UnlikeCount = 1;
+                }
+                else
+                {
+                    // Hiçbiri gelmediyse tamamen sıfırla
+                    stat.LikeCount = 0;
+                    stat.UnlikeCount = 0;
+                }
+
+                stat.UpdatedAt = DateTime.UtcNow;
+            }
+
+            // Video toplam izlenme & metadata
+            var totalView = await _context.VideoTotalView
+                .FirstOrDefaultAsync(x => x.VideoId == dto.VideoId); 
+
+            await _context.SaveChangesAsync();
+
+            var totalStats = await _context.MobileVideoStats
+                .Where(x => x.VideoId == dto.VideoId)
+                .GroupBy(x => x.VideoId)
+                .Select(g => new
+                {
+                    TotalLikes = g.Sum(s => s.LikeCount),
+                    TotalUnlikes = g.Sum(s => s.UnlikeCount)
+                })
+                .FirstOrDefaultAsync();
+
+            // Yanıt
+            return Ok(new
+            {
+                stat.VideoId,
+                stat.UserId,
+                TotalViews = totalView != null ? totalView.TotalViews : 0,
+                TotalLikes = totalStats?.TotalLikes ?? stat.LikeCount,
+                TotalUnlikes = totalStats?.TotalUnlikes ?? stat.UnlikeCount,
+                totalView?.EmbedCode,
+                totalView?.VideoUrl,
+                totalView?.VideoImage
+            });
+        }
+
+
+        [HttpGet("video-stat")]
+        public async Task<IActionResult> GetVideoStat([FromQuery] string videoId,[FromQuery] string userId,[FromQuery] string embedCode,[FromQuery] string videoUrl,[FromQuery] string videoImage)
+        {
+            if (string.IsNullOrWhiteSpace(videoId) || string.IsNullOrWhiteSpace(userId))
+                return BadRequest(new { message = "VideoId ve UserId zorunludur." });
+
+            // Kullanıcı bazlı istatistik
+            var stat = await _context.MobileVideoStats
+                .FirstOrDefaultAsync(x => x.VideoId == videoId && x.UserId == userId);
+
+            if (stat == null)
+            {
+                stat = new MobileVideoStat
+                {
+                    VideoId = videoId,
+                    UserId = userId,
+                    LikeCount = 0,
+                    UnlikeCount = 0,
+                    ViewCount = 1
+                };
+                _context.MobileVideoStats.Add(stat);
+            }
+            else
+            {
+                stat.ViewCount++;
+                stat.UpdatedAt = DateTime.UtcNow;
+            }
+
+            // Toplam izlenme + metadata
+            var totalView = await _context.VideoTotalView
+                .FirstOrDefaultAsync(x => x.VideoId == videoId);
+
+            if (totalView == null)
+            {
+                totalView = new VideoTotalView
+                {
+                    VideoId = videoId,
+                    TotalViews = 1,
+                    EmbedCode = embedCode,
+                    VideoUrl = videoUrl,
+                    VideoImage = videoImage
+                };
+                _context.VideoTotalView.Add(totalView);
+            }
+            else
+            {
+                totalView.TotalViews++;
+
+                // GET isteğinden metadata geldiyse güncelle
+                if (!string.IsNullOrWhiteSpace(embedCode))
+                    totalView.EmbedCode = embedCode;
+
+                if (!string.IsNullOrWhiteSpace(videoUrl))
+                    totalView.VideoUrl = videoUrl;
+
+                if (!string.IsNullOrWhiteSpace(videoImage))
+                    totalView.VideoImage = videoImage;
+            }
+
+            await _context.SaveChangesAsync();
+
+            // Toplam istatistikler
+            var totalStats = await _context.MobileVideoStats
+                .Where(x => x.VideoId == videoId)
+                .GroupBy(x => x.VideoId)
+                .Select(g => new
+                {
+                    TotalLikes = g.Sum(s => s.LikeCount),
+                    TotalUnlikes = g.Sum(s => s.UnlikeCount)
+                })
+                .FirstOrDefaultAsync();
+
+            return Ok(new
+            {
+                stat.VideoId,
+                stat.UserId,
+                UserLikes = stat.LikeCount,
+                UserUnlikes = stat.UnlikeCount,
+                TotalViews = totalView.TotalViews,
+                TotalLikes = totalStats?.TotalLikes ?? stat.LikeCount,
+                TotalUnlikes = totalStats?.TotalUnlikes ?? stat.UnlikeCount,
+                totalView.EmbedCode,
+                totalView.VideoUrl,
+                totalView.VideoImage
+            });
+        }
+
+        [HttpGet("video-most-viewed")]
+        public async Task<IActionResult> GetMostViewedVideos([FromQuery] int top = 10)
+        {
+            if (top <= 0)
+                top = 10;
+
+            var videos = await _context.VideoTotalView
+                .OrderByDescending(v => v.TotalViews)
+                .Take(top)
+                .Select(v => new
+                {
+                    v.VideoId,
+                    v.TotalViews,
+                    v.EmbedCode,
+                    v.VideoUrl,
+                    v.VideoImage,
+                    TotalLikes = _context.MobileVideoStats
+                        .Where(s => s.VideoId == v.VideoId)
+                        .Sum(s => s.LikeCount),
+
+                    TotalUnlikes = _context.MobileVideoStats
+                        .Where(s => s.VideoId == v.VideoId)
+                        .Sum(s => s.UnlikeCount)
+                })
+                .ToListAsync();
+
+            return Ok(videos);
+        }
+        [HttpGet("video-most-liked")]
+        public async Task<IActionResult> GetMostLikedVideos([FromQuery] int top = 10)
+        {
+            if (top <= 0)
+                top = 10;
+
+            var videos = await _context.MobileVideoStats
+                .GroupBy(s => s.VideoId)
+                .Select(g => new
+                {
+                    VideoId = g.Key,
+                    TotalLikes = g.Sum(x => x.LikeCount),
+                    TotalUnlikes = g.Sum(x => x.UnlikeCount),
+                    TotalViews = _context.VideoTotalView
+                        .Where(v => v.VideoId == g.Key)
+                        .Select(v => v.TotalViews)
+                        .FirstOrDefault(),
+                    EmbedCode = _context.VideoTotalView
+                        .Where(v => v.VideoId == g.Key)
+                        .Select(v => v.EmbedCode)
+                        .FirstOrDefault(),
+                    VideoUrl = _context.VideoTotalView
+                        .Where(v => v.VideoId == g.Key)
+                        .Select(v => v.VideoUrl)
+                        .FirstOrDefault(),
+                    VideoImage = _context.VideoTotalView
+                        .Where(v => v.VideoId == g.Key)
+                        .Select(v => v.VideoImage)
+                        .FirstOrDefault()
+                })
+                .OrderByDescending(x => x.TotalLikes)
+                .Take(top)
+                .ToListAsync();
+
+            return Ok(videos);
+        }
+
+        [HttpPost("video-stats-by-ids")]
+        public async Task<IActionResult> GetVideoStatsByIds([FromBody] List<string> videoIds)
+        {
+            if (videoIds == null || videoIds.Count == 0)
+                return BadRequest(new { message = "VideoId listesi boş olamaz." });
+
+            // Toplu VideoTotalView kayıtlarını çekelim
+            var totalViews = await _context.VideoTotalView
+                .Where(v => videoIds.Contains(v.VideoId))
+                .ToListAsync();
+
+            // Like/Unlike toplamlarını gruplayalım
+            var stats = await _context.MobileVideoStats
+                .Where(s => videoIds.Contains(s.VideoId))
+                .GroupBy(s => s.VideoId)
+                .Select(g => new
+                {
+                    VideoId = g.Key,
+                    TotalLikes = g.Sum(x => x.LikeCount),
+                    TotalUnlikes = g.Sum(x => x.UnlikeCount)
+                })
+                .ToListAsync();
+
+            // Birleştirip final listeyi oluşturalım
+            var result = videoIds.Select(id =>
+            {
+                var view = totalViews.FirstOrDefault(v => v.VideoId == id);
+                var stat = stats.FirstOrDefault(s => s.VideoId == id);
+
+                return new
+                {
+                    VideoId = id,
+                    TotalViews = view?.TotalViews ?? 0,
+                    TotalLikes = stat?.TotalLikes ?? 0,
+                    TotalUnlikes = stat?.TotalUnlikes ?? 0,
+                    EmbedCode = view?.EmbedCode,
+                    VideoUrl = view?.VideoUrl,
+                    VideoImage = view?.VideoImage
+                };
+            });
+
+            return Ok(result);
+        }
+
     }
 }
