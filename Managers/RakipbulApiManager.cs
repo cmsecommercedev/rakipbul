@@ -112,4 +112,26 @@ public async Task<RakipbulSearchResponse> SearchAsync(string term)
     }
 }
 
+public async Task<List<RakipbulMatchDto>> GetMatchesByDateAsync(int leagueId, int seasonId, DateTime date)
+{
+    using (var client = new HttpClient())
+    {
+        var tokenResult = await GetAuthTokenAsync();
+        var accessToken = tokenResult.Access;
+
+        client.DefaultRequestHeaders.Accept.Add(
+            new MediaTypeWithQualityHeaderValue("application/json"));
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var dateStr = date.ToString("yyyy-MM-dd");
+        var matchesUrl = $"{_settings.Endpoint}leagues/{leagueId}/seasons/{seasonId}/matches/?date={dateStr}";
+        var response = await client.GetAsync(matchesUrl);
+        response.EnsureSuccessStatusCode();
+        var json = await response.Content.ReadAsStringAsync();
+        var matches = JsonConvert.DeserializeObject<List<RakipbulMatchDto>>(json) ?? new List<RakipbulMatchDto>();
+        return matches;
+    }
+}
+
 }

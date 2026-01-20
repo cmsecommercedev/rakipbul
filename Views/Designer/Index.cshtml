@@ -1,0 +1,1543 @@
+@{
+    ViewBag.Title = "Poster Designer";
+    Layout = "_AdminLayoutNoMenu";
+    var leagues = ViewBag.Leagues as IEnumerable<RakipbulLeagueDto> ?? new List<RakipbulLeagueDto>();
+}
+
+<style>
+    :root {
+        --primary-color: #3b82f6;
+        --primary-hover: #2563eb;
+        --danger-color: #ef4444;
+        --danger-hover: #dc2626;
+        --bg-dark: #1e1e2e;
+        --bg-panel: #2a2a3e;
+        --bg-input: #3a3a4e;
+        --text-primary: #ffffff;
+        --text-secondary: #a0a0b0;
+        --border-color: #4a4a5e;
+        --selection-color: #3b82f6;
+        --toolbar-height: 56px;
+    }
+
+    .designer-container {
+        display: flex;
+        flex-direction: column;
+        height: calc(100vh - 60px);
+        background-color: var(--bg-dark);
+    }
+
+    .toolbar {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 8px 16px;
+        background-color: var(--bg-panel);
+        border-bottom: 1px solid var(--border-color);
+        flex-wrap: wrap;
+    }
+
+    .toolbar-section {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .toolbar-divider {
+        width: 1px;
+        height: 32px;
+        background-color: var(--border-color);
+        margin: 0 8px;
+    }
+
+    .main-content {
+        display: flex;
+        flex: 1;
+        overflow: hidden;
+    }
+
+    .canvas-area {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        overflow: auto;
+        background-color: var(--bg-dark);
+        background-image: 
+            linear-gradient(45deg, #2a2a3e 25%, transparent 25%),
+            linear-gradient(-45deg, #2a2a3e 25%, transparent 25%),
+            linear-gradient(45deg, transparent 75%, #2a2a3e 75%),
+            linear-gradient(-45deg, transparent 75%, #2a2a3e 75%);
+        background-size: 20px 20px;
+        background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+    }
+
+    .design-canvas {
+        position: relative;
+        background-color: #404050;
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        overflow: hidden;
+        cursor: default;
+    }
+
+    .design-canvas.bg-contain { background-size: contain; }
+    .design-canvas.bg-cover { background-size: cover; }
+
+    .design-canvas::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(135deg, #3a3a4e 0%, #2a2a3e 100%);
+        z-index: 0;
+        opacity: 1;
+        transition: opacity 0.3s ease;
+    }
+
+    .design-canvas.has-background::before { opacity: 0; }
+
+    .text-layer {
+        position: absolute;
+        cursor: move;
+        user-select: none;
+        white-space: pre-wrap;
+        word-break: break-word;
+        padding: 4px 8px;
+        border: 2px solid transparent;
+        border-radius: 4px;
+        transition: border-color 0.15s ease;
+        z-index: 1;
+        min-width: 50px;
+        min-height: 24px;
+    }
+
+    .text-layer:hover { border-color: rgba(255, 255, 255, 0.3); }
+    .text-layer.selected {
+        border-color: var(--selection-color);
+        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+    }
+    .text-layer.editing {
+        cursor: text;
+        border-color: var(--primary-color);
+    }
+
+    .image-layer {
+        position: absolute;
+        cursor: move;
+        user-select: none;
+        border: 2px solid transparent;
+        border-radius: 4px;
+        transition: border-color 0.15s ease;
+        z-index: 1;
+        background-size: contain;
+        background-repeat: no-repeat;
+        background-position: center;
+    }
+
+    .image-layer:hover { border-color: rgba(255, 255, 255, 0.3); }
+    .image-layer.selected {
+        border-color: var(--selection-color);
+        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+    }
+
+    .properties-panel {
+        width: 280px;
+        background-color: var(--bg-panel);
+        border-left: 1px solid var(--border-color);
+        padding: 16px;
+        overflow-y: auto;
+        flex-shrink: 0;
+        color: var(--text-primary);
+    }
+
+    .panel-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 16px;
+    }
+
+    .panel-section { margin-bottom: 20px; }
+
+    .panel-section-title {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text-secondary);
+        margin-bottom: 8px;
+    }
+
+    .no-selection-message {
+        color: var(--text-secondary);
+        font-size: 13px;
+        text-align: center;
+        padding: 40px 20px;
+    }
+
+    .designer-label {
+        display: block;
+        font-size: 12px;
+        color: var(--text-secondary);
+        margin-bottom: 4px;
+    }
+
+    .designer-input,
+    .designer-select,
+    .designer-textarea {
+        width: 100%;
+        padding: 8px 10px;
+        background-color: var(--bg-input);
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        color: var(--text-primary);
+        font-size: 13px;
+        outline: none;
+        transition: border-color 0.2s ease;
+    }
+
+    .designer-input:focus,
+    .designer-select:focus,
+    .designer-textarea:focus {
+        border-color: var(--primary-color);
+    }
+
+    .designer-color {
+        width: 100%;
+        height: 36px;
+        padding: 2px;
+        background-color: var(--bg-input);
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        cursor: pointer;
+    }
+
+    .designer-range {
+        width: 100%;
+        height: 6px;
+        -webkit-appearance: none;
+        appearance: none;
+        background: var(--bg-input);
+        border-radius: 3px;
+        outline: none;
+    }
+
+    .designer-range::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 16px;
+        height: 16px;
+        background: var(--primary-color);
+        border-radius: 50%;
+        cursor: pointer;
+    }
+
+    .file-input-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 14px;
+        background-color: var(--bg-input);
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        color: var(--text-primary);
+        font-size: 13px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .file-input-label:hover { background-color: var(--border-color); }
+
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        padding: 8px 14px;
+        border: none;
+        border-radius: 6px;
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .btn-primary {
+        background-color: var(--primary-color);
+        color: white;
+    }
+    .btn-primary:hover { background-color: var(--primary-hover); }
+
+    .btn-danger {
+        background-color: var(--danger-color);
+        color: white;
+    }
+    .btn-danger:hover { background-color: var(--danger-hover); }
+
+    .btn-secondary {
+        background-color: var(--bg-input);
+        color: var(--text-primary);
+        border: 1px solid var(--border-color);
+    }
+    .btn-secondary:hover { background-color: var(--border-color); }
+
+    .btn-success {
+        background-color: #10b981;
+        color: white;
+    }
+    .btn-success:hover { background-color: #059669; }
+
+    .input-group { margin-bottom: 12px; }
+
+    .input-row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+    }
+    .input-row > * { flex: 1; }
+
+    .input-with-unit {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+    .input-with-unit input { flex: 1; }
+    .input-with-unit .unit {
+        font-size: 12px;
+        color: var(--text-secondary);
+        min-width: 24px;
+    }
+
+    .checkbox-group {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .checkbox-group input[type="checkbox"] {
+        width: 16px;
+        height: 16px;
+        accent-color: var(--primary-color);
+        cursor: pointer;
+    }
+    .checkbox-group label {
+        margin-bottom: 0;
+        cursor: pointer;
+    }
+
+    .btn-group {
+        display: flex;
+        gap: 4px;
+    }
+    .btn-group .btn {
+        flex: 1;
+        padding: 6px 10px;
+    }
+    .btn-group .btn.active {
+        background-color: var(--primary-color);
+        color: white;
+    }
+
+    .slider-group {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .slider-group input[type="range"] { flex: 1; }
+    .slider-group .slider-value {
+        font-size: 12px;
+        color: var(--text-secondary);
+        min-width: 36px;
+        text-align: right;
+    }
+
+    .icon {
+        width: 16px;
+        height: 16px;
+        fill: currentColor;
+    }
+
+    @@media (max-width: 768px) {
+        .main-content { flex-direction: column; }
+        .properties-panel {
+            width: 100%;
+            max-height: 40vh;
+            border-left: none;
+            border-top: 1px solid var(--border-color);
+        }
+        .toolbar {
+            flex-wrap: wrap;
+            height: auto;
+            padding: 12px;
+        }
+    }
+</style>
+
+<div class="designer-container">
+    <!-- Toolbar -->
+    <div class="toolbar">
+        <!-- Lig Seçimi -->
+        <div class="toolbar-section">
+            <label class="designer-label" style="margin-bottom:0;margin-right:4px;color:#fff;">Lig:</label>
+            <select id="leagueSelect" class="designer-select" style="width:180px;">
+                <option value="">-- Lig Seçin --</option>
+                @foreach (var league in leagues)
+                {
+                    <option value="@league.Id">@league.Name</option>
+                }
+            </select>
+        </div>
+
+        <!-- Sezon Seçimi -->
+        <div class="toolbar-section">
+            <label class="designer-label" style="margin-bottom:0;margin-right:4px;color:#fff;">Sezon:</label>
+            <select id="seasonSelect" class="designer-select" style="width:180px;">
+                <option value="">-- Sezon Seçin --</option>
+            </select>
+        </div>
+
+        <!-- Tarih Seçimi -->
+        <div class="toolbar-section">
+            <label class="designer-label" style="margin-bottom:0;margin-right:4px;color:#fff;">Tarih:</label>
+            <input type="date" id="matchDateInput" class="designer-input" style="width:150px;">
+        </div>
+
+        <!-- Maç Seçimi -->
+        <div class="toolbar-section">
+            <label class="designer-label" style="margin-bottom:0;margin-right:4px;color:#fff;">Maç:</label>
+            <select id="matchSelect" class="designer-select" style="width:240px;">
+                <option value="">-- Maç Seçin --</option>
+            </select>
+        </div>
+
+        <!-- Lig Bilgisi Ekle -->
+        <div class="toolbar-section">
+            <button class="btn btn-success" id="addLeagueInfoBtn">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" fill="currentColor"/></svg>
+                Lig Bilgisi Ekle
+            </button>
+        </div>
+
+        <!-- Maç Bilgisi Ekle -->
+        <div class="toolbar-section">
+            <button class="btn btn-success" id="addMatchInfoBtn">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z" fill="currentColor"/></svg>
+                Maç Bilgisi Ekle
+            </button>
+        </div>
+
+        <div class="toolbar-divider"></div>
+
+        <!-- Background Upload -->
+        <div class="toolbar-section">
+            <input type="file" id="bgUpload" accept="image/*" style="display:none;">
+            <label for="bgUpload" class="file-input-label">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M19 7v2.99s-1.99.01-2 0V7h-3s.01-1.99 0-2h3V2h2v3h3v2h-3zm-3 4V8h-3V5H5c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-8h-3zM5 19l3-4 2 3 3-4 4 5H5z"/></svg>
+                Arkaplan
+            </label>
+            <select id="bgSizeMode" class="designer-select" style="width:100px;">
+                <option value="cover">Cover</option>
+                <option value="contain">Contain</option>
+            </select>
+        </div>
+
+        <div class="toolbar-divider"></div>
+
+        <!-- Canvas Size -->
+        <div class="toolbar-section">
+            <label class="designer-label" style="margin-bottom:0;margin-right:4px;color:#fff;">Boyut:</label>
+            <select id="aspectRatio" class="designer-select" style="width:100px;">
+                <option value="1:1">1:1</option>
+                <option value="4:3">4:3</option>
+                <option value="3:2">3:2</option>
+                <option value="16:9" selected>16:9</option>
+                <option value="9:16">9:16 (Dikey)</option>
+            </select>
+            <div class="input-with-unit">
+                <input type="number" id="canvasWidth" value="1200" min="100" max="4000" class="designer-input" style="width:80px;">
+                <span class="unit">px</span>
+            </div>
+            <span style="color:var(--text-secondary);font-size:12px;" id="canvasDimensions">1200 × 675</span>
+        </div>
+
+        <div class="toolbar-divider"></div>
+
+        <!-- Add Text -->
+        <div class="toolbar-section">
+            <button class="btn btn-primary" id="addTextBtn">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M5 4v3h5.5v12h3V7H19V4H5z" fill="currentColor"/></svg>
+                Metin Ekle
+            </button>
+        </div>
+
+        <div class="toolbar-divider"></div>
+
+        <!-- Export -->
+        <div class="toolbar-section" style="margin-left:auto;">
+            <button class="btn btn-primary" id="exportBtn">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" fill="currentColor"/></svg>
+                PNG Dışa Aktar
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Canvas Area -->
+        <div class="canvas-area" id="canvasArea">
+            <div class="design-canvas" id="designCanvas"></div>
+        </div>
+
+        <!-- Properties Panel -->
+        <div class="properties-panel" id="propertiesPanel">
+            <div class="panel-title">Özellikler</div>
+
+            <div id="noSelectionMessage" class="no-selection-message">
+                Düzenlemek için bir metin katmanına tıklayın veya yeni katman oluşturmak için "Metin Ekle" butonuna tıklayın.
+            </div>
+
+            <div id="layerProperties" style="display:none;">
+                <!-- Text Content -->
+                <div class="panel-section">
+                    <div class="panel-section-title">Metin İçeriği</div>
+                    <div class="input-group">
+                        <textarea id="propText" rows="3" placeholder="Metin girin..." class="designer-textarea"></textarea>
+                    </div>
+                </div>
+
+                <!-- Font Settings -->
+                <div class="panel-section">
+                    <div class="panel-section-title">Yazı Tipi</div>
+                    <div class="input-group">
+                        <label class="designer-label">Yazı Boyutu</label>
+                        <div class="slider-group">
+                            <input type="range" id="propFontSize" min="8" max="200" value="48" class="designer-range">
+                            <span class="slider-value" id="fontSizeValue">48px</span>
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <label class="designer-label">Yazı Kalınlığı</label>
+                        <select id="propFontWeight" class="designer-select">
+                            <option value="300">İnce</option>
+                            <option value="400">Normal</option>
+                            <option value="500">Orta</option>
+                            <option value="600">Yarı Kalın</option>
+                            <option value="700" selected>Kalın</option>
+                            <option value="800">Çok Kalın</option>
+                            <option value="900">Siyah</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label class="designer-label">Yazı Ailesi</label>
+                        <select id="propFontFamily" class="designer-select">
+                            <option value="system-ui, -apple-system, sans-serif">Sistem Varsayılan</option>
+                            <option value="Arial, sans-serif">Arial</option>
+                            <option value="Helvetica, sans-serif">Helvetica</option>
+                            <option value="Georgia, serif">Georgia</option>
+                            <option value="'Times New Roman', serif">Times New Roman</option>
+                            <option value="'Courier New', monospace">Courier New</option>
+                            <option value="Impact, sans-serif">Impact</option>
+                            <option value="'Arial Black', sans-serif">Arial Black</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Color -->
+                <div class="panel-section">
+                    <div class="panel-section-title">Renk</div>
+                    <div class="input-group">
+                        <label class="designer-label">Metin Rengi</label>
+                        <input type="color" id="propColor" value="#ffffff" class="designer-color">
+                    </div>
+                </div>
+
+                <!-- Alignment -->
+                <div class="panel-section">
+                    <div class="panel-section-title">Hizalama</div>
+                    <div class="input-group">
+                        <div class="btn-group">
+                            <button class="btn btn-secondary" data-align="left" title="Sola Hizala">
+                                <svg class="icon" viewBox="0 0 24 24"><path d="M15 15H3v2h12v-2zm0-8H3v2h12V7zM3 13h18v-2H3v2zm0 8h18v-2H3v2zM3 3v2h18V3H3z" fill="currentColor"/></svg>
+                            </button>
+                            <button class="btn btn-secondary active" data-align="center" title="Ortala">
+                                <svg class="icon" viewBox="0 0 24 24"><path d="M7 15v2h10v-2H7zm-4 6h18v-2H3v2zm0-8h18v-2H3v2zm4-6v2h10V7H7zM3 3v2h18V3H3z" fill="currentColor"/></svg>
+                            </button>
+                            <button class="btn btn-secondary" data-align="right" title="Sağa Hizala">
+                                <svg class="icon" viewBox="0 0 24 24"><path d="M3 21h18v-2H3v2zm6-4h12v-2H9v2zm-6-4h18v-2H3v2zm6-4h12V7H9v2zM3 3v2h18V3H3z" fill="currentColor"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Text Shadow -->
+                <div class="panel-section">
+                    <div class="panel-section-title">Metin Gölgesi</div>
+                    <div class="input-group">
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="propShadowEnabled">
+                            <label for="propShadowEnabled">Gölge Etkinleştir</label>
+                        </div>
+                    </div>
+                    <div id="shadowControls" style="display:none;">
+                        <div class="input-group">
+                            <label class="designer-label">Gölge Rengi</label>
+                            <input type="color" id="propShadowColor" value="#000000" class="designer-color">
+                        </div>
+                        <div class="input-group">
+                            <label class="designer-label">X Ofseti</label>
+                            <div class="slider-group">
+                                <input type="range" id="propShadowX" min="-20" max="20" value="2" class="designer-range">
+                                <span class="slider-value" id="shadowXValue">2px</span>
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <label class="designer-label">Y Ofseti</label>
+                            <div class="slider-group">
+                                <input type="range" id="propShadowY" min="-20" max="20" value="2" class="designer-range">
+                                <span class="slider-value" id="shadowYValue">2px</span>
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <label class="designer-label">Bulanıklık</label>
+                            <div class="slider-group">
+                                <input type="range" id="propShadowBlur" min="0" max="30" value="4" class="designer-range">
+                                <span class="slider-value" id="shadowBlurValue">4px</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Position -->
+                <div class="panel-section">
+                    <div class="panel-section-title">Konum</div>
+                    <div class="input-group">
+                        <div class="input-row">
+                            <div>
+                                <label class="designer-label">X</label>
+                                <input type="number" id="propPosX" value="0" class="designer-input">
+                            </div>
+                            <div>
+                                <label class="designer-label">Y</label>
+                                <input type="number" id="propPosY" value="0" class="designer-input">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Delete -->
+                <div class="panel-section">
+                    <button class="btn btn-danger" id="deleteLayerBtn" style="width:100%;">
+                        <svg class="icon" viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" fill="currentColor"/></svg>
+                        Katmanı Sil
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // State
+    const state = {
+        canvasWidth: 1200,
+        aspectRatio: '16:9',
+        backgroundImage: null,
+        backgroundSizeMode: 'cover',
+        layers: [],
+        imageLayers: [],
+        selectedLayerId: null,
+        selectedImageLayerId: null,
+        nextLayerId: 1,
+        nextImageLayerId: 1,
+        isDragging: false,
+        dragStartX: 0,
+        dragStartY: 0,
+        dragLayerStartX: 0,
+        dragLayerStartY: 0,
+        selectedLeague: null,
+        selectedLeagueId: null,
+        selectedSeason: null,
+        selectedSeasonId: null,
+        selectedDate: null,
+        matches: [],
+        selectedMatch: null
+    };
+
+    // DOM refs
+    const elements = {
+        canvasArea: document.getElementById('canvasArea'),
+        designCanvas: document.getElementById('designCanvas'),
+        bgUpload: document.getElementById('bgUpload'),
+        bgSizeMode: document.getElementById('bgSizeMode'),
+        aspectRatio: document.getElementById('aspectRatio'),
+        canvasWidth: document.getElementById('canvasWidth'),
+        canvasDimensions: document.getElementById('canvasDimensions'),
+        addTextBtn: document.getElementById('addTextBtn'),
+        exportBtn: document.getElementById('exportBtn'),
+        noSelectionMessage: document.getElementById('noSelectionMessage'),
+        layerProperties: document.getElementById('layerProperties'),
+        propText: document.getElementById('propText'),
+        propFontSize: document.getElementById('propFontSize'),
+        fontSizeValue: document.getElementById('fontSizeValue'),
+        propFontWeight: document.getElementById('propFontWeight'),
+        propFontFamily: document.getElementById('propFontFamily'),
+        propColor: document.getElementById('propColor'),
+        propShadowEnabled: document.getElementById('propShadowEnabled'),
+        shadowControls: document.getElementById('shadowControls'),
+        propShadowColor: document.getElementById('propShadowColor'),
+        propShadowX: document.getElementById('propShadowX'),
+        propShadowY: document.getElementById('propShadowY'),
+        propShadowBlur: document.getElementById('propShadowBlur'),
+        shadowXValue: document.getElementById('shadowXValue'),
+        shadowYValue: document.getElementById('shadowYValue'),
+        shadowBlurValue: document.getElementById('shadowBlurValue'),
+        propPosX: document.getElementById('propPosX'),
+        propPosY: document.getElementById('propPosY'),
+        deleteLayerBtn: document.getElementById('deleteLayerBtn'),
+        alignButtons: document.querySelectorAll('[data-align]'),
+        leagueSelect: document.getElementById('leagueSelect'),
+        seasonSelect: document.getElementById('seasonSelect'),
+        matchDateInput: document.getElementById('matchDateInput'),
+        matchSelect: document.getElementById('matchSelect'),
+        addLeagueInfoBtn: document.getElementById('addLeagueInfoBtn'),
+        addMatchInfoBtn: document.getElementById('addMatchInfoBtn')
+    };
+
+    // Utility
+    function parseAspectRatio(ratio) {
+        const [w, h] = ratio.split(':').map(Number);
+        return h / w;
+    }
+
+    function calculateHeight(width, ratio) {
+        return Math.round(width * parseAspectRatio(ratio));
+    }
+
+    function getDisplayScale() {
+        const rect = elements.designCanvas.getBoundingClientRect();
+        return rect.width / state.canvasWidth;
+    }
+
+    function generateLayerId() {
+        return state.nextLayerId++;
+    }
+
+    function clamp(value, min, max) {
+        return Math.min(Math.max(value, min), max);
+    }
+
+    // Canvas
+    function updateCanvasDimensions() {
+        const width = state.canvasWidth;
+        const height = calculateHeight(width, state.aspectRatio);
+        const canvasArea = elements.canvasArea;
+        const availW = canvasArea.clientWidth - 48;
+        const availH = canvasArea.clientHeight - 48;
+        let dispW = width, dispH = height;
+        if (dispW > availW || dispH > availH) {
+            const scale = Math.min(availW / width, availH / height);
+            dispW = Math.round(width * scale);
+            dispH = Math.round(height * scale);
+        }
+        elements.designCanvas.style.width = `${dispW}px`;
+        elements.designCanvas.style.height = `${dispH}px`;
+        elements.designCanvas.dataset.actualWidth = width;
+        elements.designCanvas.dataset.actualHeight = height;
+        elements.canvasDimensions.textContent = `${width} × ${height}`;
+        updateLayerPositionsForNewSize();
+    }
+
+    function updateLayerPositionsForNewSize() {
+        const scale = getDisplayScale();
+        state.layers.forEach(layer => {
+            const el = document.getElementById(`layer-${layer.id}`);
+            if (el) {
+                layer.x = clamp(layer.x, 0, state.canvasWidth - 50);
+                layer.y = clamp(layer.y, 0, calculateHeight(state.canvasWidth, state.aspectRatio) - 20);
+                el.style.left = `${layer.x * scale}px`;
+                el.style.top = `${layer.y * scale}px`;
+                el.style.fontSize = `${layer.fontSize * scale}px`;
+            }
+        });
+        // Image layers
+        state.imageLayers.forEach(layer => {
+            const el = document.getElementById(`img-layer-${layer.id}`);
+            if (el) {
+                layer.x = clamp(layer.x, 0, state.canvasWidth - layer.width);
+                layer.y = clamp(layer.y, 0, calculateHeight(state.canvasWidth, state.aspectRatio) - layer.height);
+                el.style.left = `${layer.x * scale}px`;
+                el.style.top = `${layer.y * scale}px`;
+                el.style.width = `${layer.width * scale}px`;
+                el.style.height = `${layer.height * scale}px`;
+            }
+        });
+    }
+
+    function setBackgroundImage(url) {
+        state.backgroundImage = url;
+        elements.designCanvas.style.backgroundImage = `url(${url})`;
+        elements.designCanvas.classList.add('has-background');
+    }
+
+    function updateBackgroundSizeMode(mode) {
+        state.backgroundSizeMode = mode;
+        elements.designCanvas.classList.remove('bg-cover', 'bg-contain');
+        elements.designCanvas.classList.add(`bg-${mode}`);
+    }
+
+    // Layer
+    function createDefaultLayerProps(text = 'Yeni Metin') {
+        const h = calculateHeight(state.canvasWidth, state.aspectRatio);
+        return {
+            id: generateLayerId(),
+            text: text,
+            x: state.canvasWidth / 2 - 150,
+            y: h / 2 - 24,
+            fontSize: 48,
+            fontWeight: '700',
+            fontFamily: "system-ui, -apple-system, sans-serif",
+            color: '#ffffff',
+            textAlign: 'center',
+            shadow: { enabled: false, color: '#000000', x: 2, y: 2, blur: 4 }
+        };
+    }
+
+    function addTextLayer(text) {
+        const layer = createDefaultLayerProps(text);
+        state.layers.push(layer);
+        renderLayer(layer);
+        selectLayer(layer.id);
+    }
+
+    function renderLayer(layer) {
+        const scale = getDisplayScale();
+        const el = document.createElement('div');
+        el.id = `layer-${layer.id}`;
+        el.className = 'text-layer';
+        el.textContent = layer.text;
+        el.dataset.layerId = layer.id;
+        el.contentEditable = false;
+        applyLayerStyles(el, layer, scale);
+        el.addEventListener('mousedown', handleLayerMouseDown);
+        el.addEventListener('dblclick', handleLayerDoubleClick);
+        el.addEventListener('blur', handleLayerBlur);
+        el.addEventListener('input', handleLayerInput);
+        el.addEventListener('keydown', handleLayerKeyDown);
+        elements.designCanvas.appendChild(el);
+    }
+
+    function applyLayerStyles(el, layer, scale) {
+        el.style.left = `${layer.x * scale}px`;
+        el.style.top = `${layer.y * scale}px`;
+        el.style.fontSize = `${layer.fontSize * scale}px`;
+        el.style.fontWeight = layer.fontWeight;
+        el.style.fontFamily = layer.fontFamily;
+        el.style.color = layer.color;
+        el.style.textAlign = layer.textAlign;
+        if (layer.shadow.enabled) {
+            el.style.textShadow = `${layer.shadow.x * scale}px ${layer.shadow.y * scale}px ${layer.shadow.blur * scale}px ${layer.shadow.color}`;
+        } else {
+            el.style.textShadow = 'none';
+        }
+    }
+
+    function updateLayer(layerId, updates) {
+        const layer = state.layers.find(l => l.id === layerId);
+        if (!layer) return;
+        Object.assign(layer, updates);
+        const el = document.getElementById(`layer-${layerId}`);
+        if (el) {
+            if (updates.text !== undefined) el.textContent = updates.text;
+            applyLayerStyles(el, layer, getDisplayScale());
+        }
+    }
+
+    function deleteLayer(layerId) {
+        const idx = state.layers.findIndex(l => l.id === layerId);
+        if (idx === -1) return;
+        document.getElementById(`layer-${layerId}`)?.remove();
+        state.layers.splice(idx, 1);
+        if (state.selectedLayerId === layerId) deselectLayer();
+    }
+
+    function selectLayer(layerId) {
+        // Deselect image layer if selected
+        if (state.selectedImageLayerId !== null) {
+            document.getElementById(`img-layer-${state.selectedImageLayerId}`)?.classList.remove('selected');
+            state.selectedImageLayerId = null;
+        }
+        if (state.selectedLayerId !== null) {
+            document.getElementById(`layer-${state.selectedLayerId}`)?.classList.remove('selected');
+        }
+        state.selectedLayerId = layerId;
+        document.getElementById(`layer-${layerId}`)?.classList.add('selected');
+        updatePropertiesPanel();
+    }
+
+    function deselectLayer() {
+        if (state.selectedLayerId !== null) {
+            const el = document.getElementById(`layer-${state.selectedLayerId}`);
+            if (el) {
+                el.classList.remove('selected', 'editing');
+                el.contentEditable = false;
+            }
+        }
+        state.selectedLayerId = null;
+        updatePropertiesPanel();
+    }
+
+    function getSelectedLayer() {
+        return state.layers.find(l => l.id === state.selectedLayerId) || null;
+    }
+
+    // Image Layer Functions
+    function createImageLayer(imageUrl, x, y, width = 120, height = 120) {
+        const layer = {
+            id: state.nextImageLayerId++,
+            imageUrl: imageUrl,
+            x: x,
+            y: y,
+            width: width,
+            height: height
+        };
+        state.imageLayers.push(layer);
+        renderImageLayer(layer);
+        return layer;
+    }
+
+    function renderImageLayer(layer) {
+        const scale = getDisplayScale();
+        const el = document.createElement('div');
+        el.id = `img-layer-${layer.id}`;
+        el.className = 'image-layer';
+        el.dataset.imageLayerId = layer.id;
+        el.style.left = `${layer.x * scale}px`;
+        el.style.top = `${layer.y * scale}px`;
+        el.style.width = `${layer.width * scale}px`;
+        el.style.height = `${layer.height * scale}px`;
+        el.style.backgroundImage = `url(${layer.imageUrl})`;
+        el.addEventListener('mousedown', handleImageLayerMouseDown);
+        elements.designCanvas.appendChild(el);
+    }
+
+    function handleImageLayerMouseDown(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const layerId = parseInt(e.target.dataset.imageLayerId);
+        selectImageLayer(layerId);
+        const layer = state.imageLayers.find(l => l.id === layerId);
+        if (!layer) return;
+        state.isDragging = true;
+        state.dragStartX = e.clientX;
+        state.dragStartY = e.clientY;
+        state.dragLayerStartX = layer.x;
+        state.dragLayerStartY = layer.y;
+        document.addEventListener('mousemove', handleImageMouseMove);
+        document.addEventListener('mouseup', handleImageMouseUp);
+    }
+
+    function handleImageMouseMove(e) {
+        if (!state.isDragging || !state.selectedImageLayerId) return;
+        const scale = getDisplayScale();
+        const dx = (e.clientX - state.dragStartX) / scale;
+        const dy = (e.clientY - state.dragStartY) / scale;
+        const layer = state.imageLayers.find(l => l.id === state.selectedImageLayerId);
+        if (!layer) return;
+        const h = calculateHeight(state.canvasWidth, state.aspectRatio);
+        const nx = clamp(state.dragLayerStartX + dx, 0, state.canvasWidth - layer.width);
+        const ny = clamp(state.dragLayerStartY + dy, 0, h - layer.height);
+        layer.x = nx;
+        layer.y = ny;
+        const el = document.getElementById(`img-layer-${layer.id}`);
+        if (el) {
+            el.style.left = `${nx * scale}px`;
+            el.style.top = `${ny * scale}px`;
+        }
+    }
+
+    function handleImageMouseUp() {
+        state.isDragging = false;
+        document.removeEventListener('mousemove', handleImageMouseMove);
+        document.removeEventListener('mouseup', handleImageMouseUp);
+    }
+
+    function selectImageLayer(layerId) {
+        // Deselect text layer
+        if (state.selectedLayerId !== null) {
+            document.getElementById(`layer-${state.selectedLayerId}`)?.classList.remove('selected');
+            state.selectedLayerId = null;
+        }
+        // Deselect previous image layer
+        if (state.selectedImageLayerId !== null) {
+            document.getElementById(`img-layer-${state.selectedImageLayerId}`)?.classList.remove('selected');
+        }
+        state.selectedImageLayerId = layerId;
+        document.getElementById(`img-layer-${layerId}`)?.classList.add('selected');
+        updatePropertiesPanel();
+    }
+
+    function deselectImageLayer() {
+        if (state.selectedImageLayerId !== null) {
+            document.getElementById(`img-layer-${state.selectedImageLayerId}`)?.classList.remove('selected');
+        }
+        state.selectedImageLayerId = null;
+    }
+
+    function deleteImageLayer(layerId) {
+        const idx = state.imageLayers.findIndex(l => l.id === layerId);
+        if (idx === -1) return;
+        document.getElementById(`img-layer-${layerId}`)?.remove();
+        state.imageLayers.splice(idx, 1);
+        if (state.selectedImageLayerId === layerId) {
+            state.selectedImageLayerId = null;
+            updatePropertiesPanel();
+        }
+    }
+
+    // Properties Panel
+    function updatePropertiesPanel() {
+        const layer = getSelectedLayer();
+        if (!layer) {
+            elements.noSelectionMessage.style.display = 'block';
+            elements.layerProperties.style.display = 'none';
+            return;
+        }
+        elements.noSelectionMessage.style.display = 'none';
+        elements.layerProperties.style.display = 'block';
+        elements.propText.value = layer.text;
+        elements.propFontSize.value = layer.fontSize;
+        elements.fontSizeValue.textContent = `${layer.fontSize}px`;
+        elements.propFontWeight.value = layer.fontWeight;
+        elements.propFontFamily.value = layer.fontFamily;
+        elements.propColor.value = layer.color;
+        elements.alignButtons.forEach(b => b.classList.toggle('active', b.dataset.align === layer.textAlign));
+        elements.propShadowEnabled.checked = layer.shadow.enabled;
+        elements.shadowControls.style.display = layer.shadow.enabled ? 'block' : 'none';
+        elements.propShadowColor.value = layer.shadow.color;
+        elements.propShadowX.value = layer.shadow.x;
+        elements.propShadowY.value = layer.shadow.y;
+        elements.propShadowBlur.value = layer.shadow.blur;
+        elements.shadowXValue.textContent = `${layer.shadow.x}px`;
+        elements.shadowYValue.textContent = `${layer.shadow.y}px`;
+        elements.shadowBlurValue.textContent = `${layer.shadow.blur}px`;
+        elements.propPosX.value = Math.round(layer.x);
+        elements.propPosY.value = Math.round(layer.y);
+    }
+
+    // Drag
+    function handleLayerMouseDown(e) {
+        if (e.target.contentEditable === 'true') return;
+        e.preventDefault();
+        e.stopPropagation();
+        const layerId = parseInt(e.target.dataset.layerId);
+        selectLayer(layerId);
+        const layer = getSelectedLayer();
+        if (!layer) return;
+        state.isDragging = true;
+        state.dragStartX = e.clientX;
+        state.dragStartY = e.clientY;
+        state.dragLayerStartX = layer.x;
+        state.dragLayerStartY = layer.y;
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+    }
+
+    function handleMouseMove(e) {
+        if (!state.isDragging || !state.selectedLayerId) return;
+        const scale = getDisplayScale();
+        const dx = (e.clientX - state.dragStartX) / scale;
+        const dy = (e.clientY - state.dragStartY) / scale;
+        const h = calculateHeight(state.canvasWidth, state.aspectRatio);
+        const nx = clamp(state.dragLayerStartX + dx, 0, state.canvasWidth - 50);
+        const ny = clamp(state.dragLayerStartY + dy, 0, h - 20);
+        updateLayer(state.selectedLayerId, { x: nx, y: ny });
+        elements.propPosX.value = Math.round(nx);
+        elements.propPosY.value = Math.round(ny);
+    }
+
+    function handleMouseUp() {
+        state.isDragging = false;
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+    }
+
+    // Inline edit
+    function handleLayerDoubleClick(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const el = e.target;
+        el.contentEditable = true;
+        el.classList.add('editing');
+        el.focus();
+        const sel = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        sel.removeAllRanges();
+        sel.addRange(range);
+    }
+
+    function handleLayerBlur(e) {
+        const el = e.target;
+        el.contentEditable = false;
+        el.classList.remove('editing');
+        const layerId = parseInt(el.dataset.layerId);
+        updateLayer(layerId, { text: el.textContent });
+        if (state.selectedLayerId === layerId) elements.propText.value = el.textContent;
+    }
+
+    function handleLayerInput(e) {
+        const layerId = parseInt(e.target.dataset.layerId);
+        const layer = state.layers.find(l => l.id === layerId);
+        if (layer) layer.text = e.target.textContent;
+    }
+
+    function handleLayerKeyDown(e) {
+        if (e.key === 'Escape') e.target.blur();
+    }
+
+    // Export
+    async function exportToPNG() {
+        const width = parseInt(elements.designCanvas.dataset.actualWidth);
+        const height = parseInt(elements.designCanvas.dataset.actualHeight);
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (state.backgroundImage) {
+            await drawBackground(ctx, width, height);
+        } else {
+            const grad = ctx.createLinearGradient(0, 0, width, height);
+            grad.addColorStop(0, '#3a3a4e');
+            grad.addColorStop(1, '#2a2a3e');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, width, height);
+        }
+        // Draw image layers
+        for (const layer of state.imageLayers) {
+            await drawImageLayer(ctx, layer);
+        }
+        // Draw text layers
+        state.layers.forEach(layer => drawTextLayer(ctx, layer));
+        const link = document.createElement('a');
+        link.download = `poster-${Date.now()}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+    }
+
+    function drawImageLayer(ctx, layer) {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = () => {
+                ctx.drawImage(img, layer.x, layer.y, layer.width, layer.height);
+                resolve();
+            };
+            img.onerror = () => {
+                console.warn('Image could not be loaded:', layer.imageUrl);
+                resolve(); // Continue even if image fails
+            };
+            img.src = layer.imageUrl;
+        });
+    }
+
+    function drawBackground(ctx, width, height) {
+        return new Promise(resolve => {
+            const img = new Image();
+            img.onload = () => {
+                let sx = 0, sy = 0, sw = img.width, sh = img.height;
+                let dx = 0, dy = 0, dw = width, dh = height;
+                const imgR = img.width / img.height;
+                const canR = width / height;
+                if (state.backgroundSizeMode === 'cover') {
+                    if (imgR > canR) { sw = img.height * canR; sx = (img.width - sw) / 2; }
+                    else { sh = img.width / canR; sy = (img.height - sh) / 2; }
+                } else {
+                    if (imgR > canR) { dh = width / imgR; dy = (height - dh) / 2; }
+                    else { dw = height * imgR; dx = (width - dw) / 2; }
+                    ctx.fillStyle = '#2a2a3e';
+                    ctx.fillRect(0, 0, width, height);
+                }
+                ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
+                resolve();
+            };
+            img.src = state.backgroundImage;
+        });
+    }
+
+    function drawTextLayer(ctx, layer) {
+        ctx.font = `${layer.fontWeight} ${layer.fontSize}px ${layer.fontFamily}`;
+        ctx.fillStyle = layer.color;
+        ctx.textAlign = layer.textAlign;
+        ctx.textBaseline = 'top';
+        let x = layer.x;
+        if (layer.textAlign === 'center') {
+            const m = ctx.measureText(layer.text);
+            x = layer.x + m.width / 2;
+        } else if (layer.textAlign === 'right') {
+            const m = ctx.measureText(layer.text);
+            x = layer.x + m.width;
+        }
+        if (layer.shadow.enabled) {
+            ctx.shadowColor = layer.shadow.color;
+            ctx.shadowOffsetX = layer.shadow.x;
+            ctx.shadowOffsetY = layer.shadow.y;
+            ctx.shadowBlur = layer.shadow.blur;
+        } else {
+            ctx.shadowColor = 'transparent';
+            ctx.shadowOffsetX = ctx.shadowOffsetY = ctx.shadowBlur = 0;
+        }
+        const lines = layer.text.split('\n');
+        let y = layer.y;
+        lines.forEach(line => {
+            ctx.fillText(line, x, y);
+            y += layer.fontSize * 1.2;
+        });
+    }
+
+    // Event Handlers
+    function handleBackgroundUpload(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = ev => setBackgroundImage(ev.target.result);
+        reader.readAsDataURL(file);
+    }
+
+    function handleAspectRatioChange() {
+        state.aspectRatio = elements.aspectRatio.value;
+        updateCanvasDimensions();
+    }
+
+    function handleCanvasWidthChange() {
+        const val = parseInt(elements.canvasWidth.value);
+        if (isNaN(val) || val < 100 || val > 4000) return;
+        state.canvasWidth = val;
+        updateCanvasDimensions();
+    }
+
+    function handleBgSizeModeChange() {
+        updateBackgroundSizeMode(elements.bgSizeMode.value);
+    }
+
+    function handleCanvasClick(e) {
+        if (e.target === elements.designCanvas) {
+            deselectLayer();
+            deselectImageLayer();
+        }
+    }
+
+    function handleKeyDown(e) {
+        if (document.activeElement.contentEditable === 'true' ||
+            ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
+        if ((e.key === 'Delete' || e.key === 'Backspace')) {
+            e.preventDefault();
+            if (state.selectedLayerId) {
+                deleteLayer(state.selectedLayerId);
+            } else if (state.selectedImageLayerId) {
+                deleteImageLayer(state.selectedImageLayerId);
+            }
+        }
+    }
+
+    // League/Season/Match handlers
+    function handleLeagueChange() {
+        const leagueId = elements.leagueSelect.value;
+        elements.seasonSelect.innerHTML = '<option value="">-- Sezon Seçin --</option>';
+        elements.matchSelect.innerHTML = '<option value="">-- Maç Seçin --</option>';
+        state.selectedLeague = leagueId ? elements.leagueSelect.options[elements.leagueSelect.selectedIndex].text : null;
+        state.selectedLeagueId = leagueId || null;
+        state.selectedSeason = null;
+        state.selectedSeasonId = null;
+        state.matches = [];
+        state.selectedMatch = null;
+        if (!leagueId) return;
+        elements.seasonSelect.innerHTML = '<option value="">Yükleniyor...</option>';
+        fetch(`/Designer/GetSeasons?leagueId=${leagueId}`)
+            .then(r => r.json())
+            .then(data => {
+                elements.seasonSelect.innerHTML = '<option value="">-- Sezon Seçin --</option>';
+                data.forEach(s => {
+                    const opt = document.createElement('option');
+                    opt.value = s.id;
+                    opt.textContent = s.fullname || s.name || `${s.year}`;
+                    elements.seasonSelect.appendChild(opt);
+                });
+            })
+            .catch(() => {
+                elements.seasonSelect.innerHTML = '<option value="">Hata!</option>';
+            });
+    }
+
+    function handleSeasonChange() {
+        const seasonId = elements.seasonSelect.value;
+        state.selectedSeason = seasonId ? elements.seasonSelect.options[elements.seasonSelect.selectedIndex].text : null;
+        state.selectedSeasonId = seasonId || null;
+        elements.matchSelect.innerHTML = '<option value="">-- Maç Seçin --</option>';
+        state.matches = [];
+        state.selectedMatch = null;
+        // Eğer tarih seçiliyse maçları yükle
+        if (seasonId && state.selectedDate) {
+            loadMatches();
+        }
+    }
+
+    function handleDateChange() {
+        const dateValue = elements.matchDateInput.value;
+        state.selectedDate = dateValue || null;
+        elements.matchSelect.innerHTML = '<option value="">-- Maç Seçin --</option>';
+        state.matches = [];
+        state.selectedMatch = null;
+        // Eğer lig ve sezon seçiliyse maçları yükle
+        if (state.selectedLeagueId && state.selectedSeasonId && dateValue) {
+            loadMatches();
+        }
+    }
+
+    function loadMatches() {
+        if (!state.selectedLeagueId || !state.selectedSeasonId || !state.selectedDate) return;
+        elements.matchSelect.innerHTML = '<option value="">Yükleniyor...</option>';
+        fetch(`/Designer/GetMatches?leagueId=${state.selectedLeagueId}&seasonId=${state.selectedSeasonId}&date=${state.selectedDate}`)
+            .then(r => r.json())
+            .then(data => {
+                state.matches = data;
+                elements.matchSelect.innerHTML = '<option value="">-- Maç Seçin --</option>';
+                if (data.length === 0) {
+                    elements.matchSelect.innerHTML = '<option value="">Bu tarihte maç yok</option>';
+                    return;
+                }
+                data.forEach(m => {
+                    const opt = document.createElement('option');
+                    opt.value = m.id;
+                    const team1Name = m.team1?.name || 'Takım 1';
+                    const team2Name = m.team2?.name || 'Takım 2';
+                    opt.textContent = `${team1Name} vs ${team2Name}`;
+                    elements.matchSelect.appendChild(opt);
+                });
+            })
+            .catch(() => {
+                elements.matchSelect.innerHTML = '<option value="">Hata!</option>';
+            });
+    }
+
+    function handleMatchChange() {
+        const matchId = elements.matchSelect.value;
+        if (!matchId) {
+            state.selectedMatch = null;
+            return;
+        }
+        state.selectedMatch = state.matches.find(m => m.id == matchId) || null;
+    }
+
+    function handleAddLeagueInfo() {
+        if (!state.selectedLeague) {
+            alert('Lütfen önce bir lig seçin.');
+            return;
+        }
+        let text = state.selectedLeague;
+        if (state.selectedSeason) text += ` - ${state.selectedSeason}`;
+        addTextLayer(text);
+    }
+
+    function handleAddMatchInfo() {
+        if (!state.selectedMatch) {
+            alert('Lütfen önce bir maç seçin.');
+            return;
+        }
+        const match = state.selectedMatch;
+        const team1Name = match.team1?.name || 'Takım 1';
+        const team2Name = match.team2?.name || 'Takım 2';
+        // API'dan gelen property isimleri (camelCase veya snake_case olabilir)
+        const team1Image = match.team1?.image_Url || match.team1?.image_url || match.team1?.imageUrl || match.team1?.image || null;
+        const team2Image = match.team2?.image_Url || match.team2?.image_url || match.team2?.imageUrl || match.team2?.image || null;
+        
+        const canvasW = state.canvasWidth;
+        const canvasH = calculateHeight(canvasW, state.aspectRatio);
+        const centerY = canvasH / 2;
+        
+        // Logo boyutları
+        const logoSize = 120;
+        const spacing = 80;
+        const textOffset = 60;
+        
+        // Sol takım logosu (sol tarafta)
+        if (team1Image) {
+            createImageLayer(team1Image, canvasW / 2 - logoSize - spacing - logoSize / 2, centerY - logoSize / 2, logoSize, logoSize);
+        }
+        
+        // Sağ takım logosu (sağ tarafta)
+        if (team2Image) {
+            createImageLayer(team2Image, canvasW / 2 + spacing + logoSize / 2, centerY - logoSize / 2, logoSize, logoSize);
+        }
+        
+        // Sol takım adı (logonun altında)
+        const team1Layer = createDefaultLayerProps(team1Name);
+        team1Layer.x = canvasW / 2 - spacing - logoSize - 50;
+        team1Layer.y = centerY + logoSize / 2 + 20;
+        team1Layer.fontSize = 32;
+        team1Layer.textAlign = 'center';
+        state.layers.push(team1Layer);
+        renderLayer(team1Layer);
+        
+        // VS metni (ortada)
+        const vsLayer = createDefaultLayerProps('VS');
+        vsLayer.x = canvasW / 2 - 30;
+        vsLayer.y = centerY - 30;
+        vsLayer.fontSize = 64;
+        vsLayer.fontWeight = '900';
+        vsLayer.textAlign = 'center';
+        state.layers.push(vsLayer);
+        renderLayer(vsLayer);
+        
+        // Sağ takım adı (logonun altında)
+        const team2Layer = createDefaultLayerProps(team2Name);
+        team2Layer.x = canvasW / 2 + spacing + logoSize / 2;
+        team2Layer.y = centerY + logoSize / 2 + 20;
+        team2Layer.fontSize = 32;
+        team2Layer.textAlign = 'center';
+        state.layers.push(team2Layer);
+        renderLayer(team2Layer);
+    }
+
+    // Property handlers
+    function handlePropTextChange() {
+        if (!state.selectedLayerId) return;
+        updateLayer(state.selectedLayerId, { text: elements.propText.value });
+    }
+
+    function handleFontSizeChange() {
+        if (!state.selectedLayerId) return;
+        const size = parseInt(elements.propFontSize.value);
+        elements.fontSizeValue.textContent = `${size}px`;
+        updateLayer(state.selectedLayerId, { fontSize: size });
+    }
+
+    function handleFontWeightChange() {
+        if (!state.selectedLayerId) return;
+        updateLayer(state.selectedLayerId, { fontWeight: elements.propFontWeight.value });
+    }
+
+    function handleFontFamilyChange() {
+        if (!state.selectedLayerId) return;
+        updateLayer(state.selectedLayerId, { fontFamily: elements.propFontFamily.value });
+    }
+
+    function handleColorChange() {
+        if (!state.selectedLayerId) return;
+        updateLayer(state.selectedLayerId, { color: elements.propColor.value });
+    }
+
+    function handleAlignmentClick(e) {
+        const align = e.currentTarget.dataset.align;
+        if (!state.selectedLayerId) return;
+        updateLayer(state.selectedLayerId, { textAlign: align });
+        elements.alignButtons.forEach(b => b.classList.toggle('active', b.dataset.align === align));
+    }
+
+    function handleShadowToggle() {
+        if (!state.selectedLayerId) return;
+        const layer = getSelectedLayer();
+        if (!layer) return;
+        layer.shadow.enabled = elements.propShadowEnabled.checked;
+        elements.shadowControls.style.display = layer.shadow.enabled ? 'block' : 'none';
+        updateLayer(state.selectedLayerId, { shadow: layer.shadow });
+    }
+
+    function handleShadowColorChange() {
+        if (!state.selectedLayerId) return;
+        const layer = getSelectedLayer();
+        if (!layer) return;
+        layer.shadow.color = elements.propShadowColor.value;
+        updateLayer(state.selectedLayerId, { shadow: layer.shadow });
+    }
+
+    function handleShadowXChange() {
+        if (!state.selectedLayerId) return;
+        const layer = getSelectedLayer();
+        if (!layer) return;
+        layer.shadow.x = parseInt(elements.propShadowX.value);
+        elements.shadowXValue.textContent = `${layer.shadow.x}px`;
+        updateLayer(state.selectedLayerId, { shadow: layer.shadow });
+    }
+
+    function handleShadowYChange() {
+        if (!state.selectedLayerId) return;
+        const layer = getSelectedLayer();
+        if (!layer) return;
+        layer.shadow.y = parseInt(elements.propShadowY.value);
+        elements.shadowYValue.textContent = `${layer.shadow.y}px`;
+        updateLayer(state.selectedLayerId, { shadow: layer.shadow });
+    }
+
+    function handleShadowBlurChange() {
+        if (!state.selectedLayerId) return;
+        const layer = getSelectedLayer();
+        if (!layer) return;
+        layer.shadow.blur = parseInt(elements.propShadowBlur.value);
+        elements.shadowBlurValue.textContent = `${layer.shadow.blur}px`;
+        updateLayer(state.selectedLayerId, { shadow: layer.shadow });
+    }
+
+    function handlePosXChange() {
+        if (!state.selectedLayerId) return;
+        const x = parseInt(elements.propPosX.value);
+        if (!isNaN(x)) updateLayer(state.selectedLayerId, { x: clamp(x, 0, state.canvasWidth - 50) });
+    }
+
+    function handlePosYChange() {
+        if (!state.selectedLayerId) return;
+        const y = parseInt(elements.propPosY.value);
+        const maxY = calculateHeight(state.canvasWidth, state.aspectRatio) - 20;
+        if (!isNaN(y)) updateLayer(state.selectedLayerId, { y: clamp(y, 0, maxY) });
+    }
+
+    function handleDeleteLayer() {
+        if (state.selectedLayerId) deleteLayer(state.selectedLayerId);
+    }
+
+    function handleResize() {
+        updateCanvasDimensions();
+    }
+
+    // Init
+    function attachEventListeners() {
+        elements.bgUpload.addEventListener('change', handleBackgroundUpload);
+        elements.bgSizeMode.addEventListener('change', handleBgSizeModeChange);
+        elements.aspectRatio.addEventListener('change', handleAspectRatioChange);
+        elements.canvasWidth.addEventListener('change', handleCanvasWidthChange);
+        elements.addTextBtn.addEventListener('click', () => addTextLayer('Yeni Metin'));
+        elements.exportBtn.addEventListener('click', exportToPNG);
+        elements.designCanvas.addEventListener('click', handleCanvasClick);
+        elements.propText.addEventListener('input', handlePropTextChange);
+        elements.propFontSize.addEventListener('input', handleFontSizeChange);
+        elements.propFontWeight.addEventListener('change', handleFontWeightChange);
+        elements.propFontFamily.addEventListener('change', handleFontFamilyChange);
+        elements.propColor.addEventListener('input', handleColorChange);
+        elements.alignButtons.forEach(btn => btn.addEventListener('click', handleAlignmentClick));
+        elements.propShadowEnabled.addEventListener('change', handleShadowToggle);
+        elements.propShadowColor.addEventListener('input', handleShadowColorChange);
+        elements.propShadowX.addEventListener('input', handleShadowXChange);
+        elements.propShadowY.addEventListener('input', handleShadowYChange);
+        elements.propShadowBlur.addEventListener('input', handleShadowBlurChange);
+        elements.propPosX.addEventListener('change', handlePosXChange);
+        elements.propPosY.addEventListener('change', handlePosYChange);
+        elements.deleteLayerBtn.addEventListener('click', handleDeleteLayer);
+        elements.leagueSelect.addEventListener('change', handleLeagueChange);
+        elements.seasonSelect.addEventListener('change', handleSeasonChange);
+        elements.matchDateInput.addEventListener('change', handleDateChange);
+        elements.matchSelect.addEventListener('change', handleMatchChange);
+        elements.addLeagueInfoBtn.addEventListener('click', handleAddLeagueInfo);
+        elements.addMatchInfoBtn.addEventListener('click', handleAddMatchInfo);
+        document.addEventListener('keydown', handleKeyDown);
+        window.addEventListener('resize', handleResize);
+    }
+
+    function init() {
+        attachEventListeners();
+        updateBackgroundSizeMode('cover');
+        updateCanvasDimensions();
+        addTextLayer('Maç Posteri');
+    }
+
+    document.addEventListener('DOMContentLoaded', init);
+</script>

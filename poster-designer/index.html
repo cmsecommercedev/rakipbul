@@ -1,0 +1,1666 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Match Poster Designer</title>
+    <style>
+        /* ============================================
+           CSS RESET & BASE STYLES
+           ============================================ */
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        :root {
+            --primary-color: #3b82f6;
+            --primary-hover: #2563eb;
+            --danger-color: #ef4444;
+            --danger-hover: #dc2626;
+            --bg-dark: #1e1e2e;
+            --bg-panel: #2a2a3e;
+            --bg-input: #3a3a4e;
+            --text-primary: #ffffff;
+            --text-secondary: #a0a0b0;
+            --border-color: #4a4a5e;
+            --selection-color: #3b82f6;
+            --toolbar-height: 56px;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* ============================================
+           LAYOUT
+           ============================================ */
+        .app-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        /* Toolbar */
+        .toolbar {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 8px 16px;
+            background-color: var(--bg-panel);
+            border-bottom: 1px solid var(--border-color);
+            height: var(--toolbar-height);
+            flex-shrink: 0;
+        }
+
+        .toolbar-section {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .toolbar-divider {
+            width: 1px;
+            height: 32px;
+            background-color: var(--border-color);
+            margin: 0 8px;
+        }
+
+        /* Main Content */
+        .main-content {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* Canvas Area */
+        .canvas-area {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            overflow: auto;
+            background-color: var(--bg-dark);
+            background-image: 
+                linear-gradient(45deg, #2a2a3e 25%, transparent 25%),
+                linear-gradient(-45deg, #2a2a3e 25%, transparent 25%),
+                linear-gradient(45deg, transparent 75%, #2a2a3e 75%),
+                linear-gradient(-45deg, transparent 75%, #2a2a3e 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+        }
+
+        /* Design Canvas */
+        .design-canvas {
+            position: relative;
+            background-color: #404050;
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            overflow: hidden;
+            cursor: default;
+        }
+
+        .design-canvas.bg-contain {
+            background-size: contain;
+        }
+
+        .design-canvas.bg-cover {
+            background-size: cover;
+        }
+
+        /* Placeholder when no background */
+        .design-canvas::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, #3a3a4e 0%, #2a2a3e 100%);
+            z-index: 0;
+            opacity: var(--placeholder-opacity, 1);
+            transition: opacity 0.3s ease;
+        }
+
+        .design-canvas.has-background::before {
+            opacity: 0;
+        }
+
+        /* Text Layer */
+        .text-layer {
+            position: absolute;
+            cursor: move;
+            user-select: none;
+            white-space: pre-wrap;
+            word-break: break-word;
+            padding: 4px 8px;
+            border: 2px solid transparent;
+            border-radius: 4px;
+            transition: border-color 0.15s ease;
+            z-index: 1;
+            min-width: 50px;
+            min-height: 24px;
+        }
+
+        .text-layer:hover {
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        .text-layer.selected {
+            border-color: var(--selection-color);
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+        }
+
+        .text-layer.editing {
+            cursor: text;
+            border-color: var(--primary-color);
+        }
+
+        /* Properties Panel */
+        .properties-panel {
+            width: 280px;
+            background-color: var(--bg-panel);
+            border-left: 1px solid var(--border-color);
+            padding: 16px;
+            overflow-y: auto;
+            flex-shrink: 0;
+        }
+
+        .panel-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 16px;
+        }
+
+        .panel-section {
+            margin-bottom: 20px;
+        }
+
+        .panel-section-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+
+        .no-selection-message {
+            color: var(--text-secondary);
+            font-size: 13px;
+            text-align: center;
+            padding: 40px 20px;
+        }
+
+        /* ============================================
+           FORM CONTROLS
+           ============================================ */
+        label {
+            display: block;
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        select,
+        textarea {
+            width: 100%;
+            padding: 8px 10px;
+            background-color: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 13px;
+            outline: none;
+            transition: border-color 0.2s ease;
+        }
+
+        input[type="text"]:focus,
+        input[type="number"]:focus,
+        select:focus,
+        textarea:focus {
+            border-color: var(--primary-color);
+        }
+
+        input[type="color"] {
+            width: 100%;
+            height: 36px;
+            padding: 2px;
+            background-color: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            -webkit-appearance: none;
+            appearance: none;
+            background: var(--bg-input);
+            border-radius: 3px;
+            outline: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            background: var(--primary-color);
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            background: var(--primary-color);
+            border-radius: 50%;
+            cursor: pointer;
+            border: none;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .file-input-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 14px;
+            background-color: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .file-input-label:hover {
+            background-color: var(--border-color);
+        }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 8px 14px;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-primary {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: var(--primary-hover);
+        }
+
+        .btn-danger {
+            background-color: var(--danger-color);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background-color: var(--danger-hover);
+        }
+
+        .btn-secondary {
+            background-color: var(--bg-input);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background-color: var(--border-color);
+        }
+
+        /* Input Group */
+        .input-group {
+            margin-bottom: 12px;
+        }
+
+        .input-row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .input-row > * {
+            flex: 1;
+        }
+
+        .input-with-unit {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .input-with-unit input {
+            flex: 1;
+        }
+
+        .input-with-unit .unit {
+            font-size: 12px;
+            color: var(--text-secondary);
+            min-width: 24px;
+        }
+
+        /* Checkbox */
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            accent-color: var(--primary-color);
+            cursor: pointer;
+        }
+
+        .checkbox-group label {
+            margin-bottom: 0;
+            cursor: pointer;
+        }
+
+        /* Button Group */
+        .btn-group {
+            display: flex;
+            gap: 4px;
+        }
+
+        .btn-group .btn {
+            flex: 1;
+            padding: 6px 10px;
+        }
+
+        .btn-group .btn.active {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        /* Slider with value */
+        .slider-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .slider-group input[type="range"] {
+            flex: 1;
+        }
+
+        .slider-group .slider-value {
+            font-size: 12px;
+            color: var(--text-secondary);
+            min-width: 36px;
+            text-align: right;
+        }
+
+        /* ============================================
+           ICONS (SVG inline)
+           ============================================ */
+        .icon {
+            width: 16px;
+            height: 16px;
+            fill: currentColor;
+        }
+
+        /* ============================================
+           RESPONSIVE
+           ============================================ */
+        @media (max-width: 768px) {
+            .main-content {
+                flex-direction: column;
+            }
+
+            .properties-panel {
+                width: 100%;
+                max-height: 40vh;
+                border-left: none;
+                border-top: 1px solid var(--border-color);
+            }
+
+            .toolbar {
+                flex-wrap: wrap;
+                height: auto;
+                padding: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Toolbar -->
+        <div class="toolbar">
+            <!-- Background Upload -->
+            <div class="toolbar-section">
+                <input type="file" id="bgUpload" accept="image/*">
+                <label for="bgUpload" class="file-input-label">
+                    <svg class="icon" viewBox="0 0 24 24"><path d="M19 7v2.99s-1.99.01-2 0V7h-3s.01-1.99 0-2h3V2h2v3h3v2h-3zm-3 4V8h-3V5H5c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-8h-3zM5 19l3-4 2 3 3-4 4 5H5z"/></svg>
+                    Background
+                </label>
+                <select id="bgSizeMode" title="Background size mode">
+                    <option value="cover">Cover</option>
+                    <option value="contain">Contain</option>
+                </select>
+            </div>
+
+            <div class="toolbar-divider"></div>
+
+            <!-- Canvas Size -->
+            <div class="toolbar-section">
+                <label style="margin-bottom: 0; margin-right: 4px;">Size:</label>
+                <select id="aspectRatio" title="Aspect ratio">
+                    <option value="1:1">1:1</option>
+                    <option value="4:3">4:3</option>
+                    <option value="3:2">3:2</option>
+                    <option value="16:9" selected>16:9</option>
+                    <option value="9:16">9:16 (Portrait)</option>
+                </select>
+                <div class="input-with-unit">
+                    <input type="number" id="canvasWidth" value="1200" min="100" max="4000" style="width: 80px;">
+                    <span class="unit">px</span>
+                </div>
+                <span style="color: var(--text-secondary); font-size: 12px;" id="canvasDimensions">1200 × 675</span>
+            </div>
+
+            <div class="toolbar-divider"></div>
+
+            <!-- Add Text -->
+            <div class="toolbar-section">
+                <button class="btn btn-primary" id="addTextBtn">
+                    <svg class="icon" viewBox="0 0 24 24"><path d="M5 4v3h5.5v12h3V7H19V4H5z" fill="currentColor"/></svg>
+                    Add Text
+                </button>
+            </div>
+
+            <div class="toolbar-divider"></div>
+
+            <!-- Export -->
+            <div class="toolbar-section" style="margin-left: auto;">
+                <button class="btn btn-primary" id="exportBtn">
+                    <svg class="icon" viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" fill="currentColor"/></svg>
+                    Export PNG
+                </button>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Canvas Area -->
+            <div class="canvas-area" id="canvasArea">
+                <div class="design-canvas" id="designCanvas">
+                    <!-- Text layers will be added here -->
+                </div>
+            </div>
+
+            <!-- Properties Panel -->
+            <div class="properties-panel" id="propertiesPanel">
+                <div class="panel-title">Properties</div>
+                
+                <div id="noSelectionMessage" class="no-selection-message">
+                    Click on a text layer to edit its properties, or click "Add Text" to create a new layer.
+                </div>
+
+                <div id="layerProperties" style="display: none;">
+                    <!-- Text Content -->
+                    <div class="panel-section">
+                        <div class="panel-section-title">Text Content</div>
+                        <div class="input-group">
+                            <textarea id="propText" rows="3" placeholder="Enter text..."></textarea>
+                        </div>
+                    </div>
+
+                    <!-- Font Settings -->
+                    <div class="panel-section">
+                        <div class="panel-section-title">Font</div>
+                        <div class="input-group">
+                            <label>Font Size</label>
+                            <div class="slider-group">
+                                <input type="range" id="propFontSize" min="8" max="200" value="48">
+                                <span class="slider-value" id="fontSizeValue">48px</span>
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <label>Font Weight</label>
+                            <select id="propFontWeight">
+                                <option value="300">Light</option>
+                                <option value="400">Normal</option>
+                                <option value="500">Medium</option>
+                                <option value="600">Semi Bold</option>
+                                <option value="700" selected>Bold</option>
+                                <option value="800">Extra Bold</option>
+                                <option value="900">Black</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label>Font Family</label>
+                            <select id="propFontFamily">
+                                <option value="system-ui, -apple-system, sans-serif">System Default</option>
+                                <option value="Arial, sans-serif">Arial</option>
+                                <option value="Helvetica, sans-serif">Helvetica</option>
+                                <option value="Georgia, serif">Georgia</option>
+                                <option value="'Times New Roman', serif">Times New Roman</option>
+                                <option value="'Courier New', monospace">Courier New</option>
+                                <option value="Impact, sans-serif">Impact</option>
+                                <option value="'Arial Black', sans-serif">Arial Black</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Color -->
+                    <div class="panel-section">
+                        <div class="panel-section-title">Color</div>
+                        <div class="input-group">
+                            <label>Text Color</label>
+                            <input type="color" id="propColor" value="#ffffff">
+                        </div>
+                    </div>
+
+                    <!-- Alignment -->
+                    <div class="panel-section">
+                        <div class="panel-section-title">Alignment</div>
+                        <div class="input-group">
+                            <div class="btn-group">
+                                <button class="btn btn-secondary" data-align="left" title="Align Left">
+                                    <svg class="icon" viewBox="0 0 24 24"><path d="M15 15H3v2h12v-2zm0-8H3v2h12V7zM3 13h18v-2H3v2zm0 8h18v-2H3v2zM3 3v2h18V3H3z" fill="currentColor"/></svg>
+                                </button>
+                                <button class="btn btn-secondary active" data-align="center" title="Align Center">
+                                    <svg class="icon" viewBox="0 0 24 24"><path d="M7 15v2h10v-2H7zm-4 6h18v-2H3v2zm0-8h18v-2H3v2zm4-6v2h10V7H7zM3 3v2h18V3H3z" fill="currentColor"/></svg>
+                                </button>
+                                <button class="btn btn-secondary" data-align="right" title="Align Right">
+                                    <svg class="icon" viewBox="0 0 24 24"><path d="M3 21h18v-2H3v2zm6-4h12v-2H9v2zm-6-4h18v-2H3v2zm6-4h12V7H9v2zM3 3v2h18V3H3z" fill="currentColor"/></svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Text Shadow -->
+                    <div class="panel-section">
+                        <div class="panel-section-title">Text Shadow</div>
+                        <div class="input-group">
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="propShadowEnabled">
+                                <label for="propShadowEnabled">Enable Shadow</label>
+                            </div>
+                        </div>
+                        <div id="shadowControls" style="display: none;">
+                            <div class="input-group">
+                                <label>Shadow Color</label>
+                                <input type="color" id="propShadowColor" value="#000000">
+                            </div>
+                            <div class="input-group">
+                                <label>Offset X</label>
+                                <div class="slider-group">
+                                    <input type="range" id="propShadowX" min="-20" max="20" value="2">
+                                    <span class="slider-value" id="shadowXValue">2px</span>
+                                </div>
+                            </div>
+                            <div class="input-group">
+                                <label>Offset Y</label>
+                                <div class="slider-group">
+                                    <input type="range" id="propShadowY" min="-20" max="20" value="2">
+                                    <span class="slider-value" id="shadowYValue">2px</span>
+                                </div>
+                            </div>
+                            <div class="input-group">
+                                <label>Blur</label>
+                                <div class="slider-group">
+                                    <input type="range" id="propShadowBlur" min="0" max="30" value="4">
+                                    <span class="slider-value" id="shadowBlurValue">4px</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Position -->
+                    <div class="panel-section">
+                        <div class="panel-section-title">Position</div>
+                        <div class="input-group">
+                            <div class="input-row">
+                                <div>
+                                    <label>X</label>
+                                    <input type="number" id="propPosX" value="0">
+                                </div>
+                                <div>
+                                    <label>Y</label>
+                                    <input type="number" id="propPosY" value="0">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Delete -->
+                    <div class="panel-section">
+                        <button class="btn btn-danger" id="deleteLayerBtn" style="width: 100%;">
+                            <svg class="icon" viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" fill="currentColor"/></svg>
+                            Delete Layer
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * Match Poster Designer
+         * A single-page web app for designing match posters
+         * Pure vanilla JavaScript - no frameworks
+         */
+
+        // ============================================
+        // APPLICATION STATE
+        // ============================================
+        const state = {
+            // Canvas settings
+            canvasWidth: 1200,
+            aspectRatio: '16:9',
+            
+            // Background
+            backgroundImage: null,
+            backgroundSizeMode: 'cover',
+            
+            // Layers
+            layers: [],
+            selectedLayerId: null,
+            nextLayerId: 1,
+            
+            // Dragging state
+            isDragging: false,
+            dragStartX: 0,
+            dragStartY: 0,
+            dragLayerStartX: 0,
+            dragLayerStartY: 0
+        };
+
+        // ============================================
+        // DOM REFERENCES
+        // ============================================
+        const elements = {
+            // Canvas
+            canvasArea: document.getElementById('canvasArea'),
+            designCanvas: document.getElementById('designCanvas'),
+            
+            // Toolbar controls
+            bgUpload: document.getElementById('bgUpload'),
+            bgSizeMode: document.getElementById('bgSizeMode'),
+            aspectRatio: document.getElementById('aspectRatio'),
+            canvasWidth: document.getElementById('canvasWidth'),
+            canvasDimensions: document.getElementById('canvasDimensions'),
+            addTextBtn: document.getElementById('addTextBtn'),
+            exportBtn: document.getElementById('exportBtn'),
+            
+            // Properties panel
+            propertiesPanel: document.getElementById('propertiesPanel'),
+            noSelectionMessage: document.getElementById('noSelectionMessage'),
+            layerProperties: document.getElementById('layerProperties'),
+            
+            // Layer property inputs
+            propText: document.getElementById('propText'),
+            propFontSize: document.getElementById('propFontSize'),
+            fontSizeValue: document.getElementById('fontSizeValue'),
+            propFontWeight: document.getElementById('propFontWeight'),
+            propFontFamily: document.getElementById('propFontFamily'),
+            propColor: document.getElementById('propColor'),
+            propShadowEnabled: document.getElementById('propShadowEnabled'),
+            shadowControls: document.getElementById('shadowControls'),
+            propShadowColor: document.getElementById('propShadowColor'),
+            propShadowX: document.getElementById('propShadowX'),
+            propShadowY: document.getElementById('propShadowY'),
+            propShadowBlur: document.getElementById('propShadowBlur'),
+            shadowXValue: document.getElementById('shadowXValue'),
+            shadowYValue: document.getElementById('shadowYValue'),
+            shadowBlurValue: document.getElementById('shadowBlurValue'),
+            propPosX: document.getElementById('propPosX'),
+            propPosY: document.getElementById('propPosY'),
+            deleteLayerBtn: document.getElementById('deleteLayerBtn'),
+            alignButtons: document.querySelectorAll('[data-align]')
+        };
+
+        // ============================================
+        // UTILITY FUNCTIONS
+        // ============================================
+        
+        /**
+         * Parse aspect ratio string to get width/height multiplier
+         * @param {string} ratio - Aspect ratio string (e.g., "16:9")
+         * @returns {number} Height multiplier
+         */
+        function parseAspectRatio(ratio) {
+            const [w, h] = ratio.split(':').map(Number);
+            return h / w;
+        }
+
+        /**
+         * Calculate canvas height based on width and aspect ratio
+         * @param {number} width - Canvas width in pixels
+         * @param {string} ratio - Aspect ratio string
+         * @returns {number} Calculated height
+         */
+        function calculateHeight(width, ratio) {
+            return Math.round(width * parseAspectRatio(ratio));
+        }
+
+        /**
+         * Get display scale factor for canvas
+         * @returns {number} Scale factor
+         */
+        function getDisplayScale() {
+            const canvasRect = elements.designCanvas.getBoundingClientRect();
+            return canvasRect.width / state.canvasWidth;
+        }
+
+        /**
+         * Generate unique layer ID
+         * @returns {number} Unique ID
+         */
+        function generateLayerId() {
+            return state.nextLayerId++;
+        }
+
+        /**
+         * Clamp a value between min and max
+         * @param {number} value - Value to clamp
+         * @param {number} min - Minimum value
+         * @param {number} max - Maximum value
+         * @returns {number} Clamped value
+         */
+        function clamp(value, min, max) {
+            return Math.min(Math.max(value, min), max);
+        }
+
+        // ============================================
+        // CANVAS MANAGEMENT
+        // ============================================
+        
+        /**
+         * Update canvas dimensions based on current settings
+         */
+        function updateCanvasDimensions() {
+            const width = state.canvasWidth;
+            const height = calculateHeight(width, state.aspectRatio);
+            
+            // Calculate display size to fit in viewport
+            const canvasArea = elements.canvasArea;
+            const availableWidth = canvasArea.clientWidth - 48;
+            const availableHeight = canvasArea.clientHeight - 48;
+            
+            let displayWidth = width;
+            let displayHeight = height;
+            
+            // Scale down if too large
+            if (displayWidth > availableWidth || displayHeight > availableHeight) {
+                const scaleX = availableWidth / width;
+                const scaleY = availableHeight / height;
+                const scale = Math.min(scaleX, scaleY);
+                displayWidth = Math.round(width * scale);
+                displayHeight = Math.round(height * scale);
+            }
+            
+            // Apply dimensions
+            elements.designCanvas.style.width = `${displayWidth}px`;
+            elements.designCanvas.style.height = `${displayHeight}px`;
+            
+            // Store actual dimensions for export
+            elements.designCanvas.dataset.actualWidth = width;
+            elements.designCanvas.dataset.actualHeight = height;
+            
+            // Update dimension display
+            elements.canvasDimensions.textContent = `${width} × ${height}`;
+            
+            // Scale layer positions
+            updateLayerPositionsForNewSize();
+        }
+
+        /**
+         * Update layer positions when canvas size changes
+         */
+        function updateLayerPositionsForNewSize() {
+            const scale = getDisplayScale();
+            
+            state.layers.forEach(layer => {
+                const element = document.getElementById(`layer-${layer.id}`);
+                if (element) {
+                    // Ensure positions are within bounds
+                    layer.x = clamp(layer.x, 0, state.canvasWidth - 50);
+                    layer.y = clamp(layer.y, 0, calculateHeight(state.canvasWidth, state.aspectRatio) - 20);
+                    
+                    element.style.left = `${layer.x * scale}px`;
+                    element.style.top = `${layer.y * scale}px`;
+                    element.style.fontSize = `${layer.fontSize * scale}px`;
+                }
+            });
+        }
+
+        /**
+         * Set background image on canvas
+         * @param {string} imageUrl - Data URL of the image
+         */
+        function setBackgroundImage(imageUrl) {
+            state.backgroundImage = imageUrl;
+            elements.designCanvas.style.backgroundImage = `url(${imageUrl})`;
+            elements.designCanvas.classList.add('has-background');
+        }
+
+        /**
+         * Update background size mode
+         * @param {string} mode - 'cover' or 'contain'
+         */
+        function updateBackgroundSizeMode(mode) {
+            state.backgroundSizeMode = mode;
+            elements.designCanvas.classList.remove('bg-cover', 'bg-contain');
+            elements.designCanvas.classList.add(`bg-${mode}`);
+        }
+
+        // ============================================
+        // LAYER MANAGEMENT
+        // ============================================
+        
+        /**
+         * Create default layer properties
+         * @returns {object} Default layer object
+         */
+        function createDefaultLayerProps() {
+            const canvasHeight = calculateHeight(state.canvasWidth, state.aspectRatio);
+            return {
+                id: generateLayerId(),
+                text: 'EURO Business vs RakipBul',
+                x: state.canvasWidth / 2 - 150,
+                y: canvasHeight / 2 - 24,
+                fontSize: 48,
+                fontWeight: '700',
+                fontFamily: "system-ui, -apple-system, sans-serif",
+                color: '#ffffff',
+                textAlign: 'center',
+                shadow: {
+                    enabled: false,
+                    color: '#000000',
+                    x: 2,
+                    y: 2,
+                    blur: 4
+                }
+            };
+        }
+
+        /**
+         * Add a new text layer
+         */
+        function addTextLayer() {
+            const layer = createDefaultLayerProps();
+            state.layers.push(layer);
+            renderLayer(layer);
+            selectLayer(layer.id);
+        }
+
+        /**
+         * Render a layer element in the canvas
+         * @param {object} layer - Layer data object
+         */
+        function renderLayer(layer) {
+            const scale = getDisplayScale();
+            
+            const element = document.createElement('div');
+            element.id = `layer-${layer.id}`;
+            element.className = 'text-layer';
+            element.textContent = layer.text;
+            element.dataset.layerId = layer.id;
+            element.contentEditable = false;
+            
+            // Apply styles
+            applyLayerStyles(element, layer, scale);
+            
+            // Event listeners
+            element.addEventListener('mousedown', handleLayerMouseDown);
+            element.addEventListener('dblclick', handleLayerDoubleClick);
+            element.addEventListener('blur', handleLayerBlur);
+            element.addEventListener('input', handleLayerInput);
+            element.addEventListener('keydown', handleLayerKeyDown);
+            
+            elements.designCanvas.appendChild(element);
+        }
+
+        /**
+         * Apply styles to a layer element
+         * @param {HTMLElement} element - Layer DOM element
+         * @param {object} layer - Layer data object
+         * @param {number} scale - Display scale factor
+         */
+        function applyLayerStyles(element, layer, scale) {
+            element.style.left = `${layer.x * scale}px`;
+            element.style.top = `${layer.y * scale}px`;
+            element.style.fontSize = `${layer.fontSize * scale}px`;
+            element.style.fontWeight = layer.fontWeight;
+            element.style.fontFamily = layer.fontFamily;
+            element.style.color = layer.color;
+            element.style.textAlign = layer.textAlign;
+            
+            if (layer.shadow.enabled) {
+                const shadowX = layer.shadow.x * scale;
+                const shadowY = layer.shadow.y * scale;
+                const shadowBlur = layer.shadow.blur * scale;
+                element.style.textShadow = `${shadowX}px ${shadowY}px ${shadowBlur}px ${layer.shadow.color}`;
+            } else {
+                element.style.textShadow = 'none';
+            }
+        }
+
+        /**
+         * Update a layer's properties
+         * @param {number} layerId - Layer ID
+         * @param {object} updates - Property updates
+         */
+        function updateLayer(layerId, updates) {
+            const layer = state.layers.find(l => l.id === layerId);
+            if (!layer) return;
+            
+            // Apply updates
+            Object.assign(layer, updates);
+            
+            // Update DOM element
+            const element = document.getElementById(`layer-${layerId}`);
+            if (element) {
+                if (updates.text !== undefined) {
+                    element.textContent = updates.text;
+                }
+                applyLayerStyles(element, layer, getDisplayScale());
+            }
+        }
+
+        /**
+         * Delete a layer
+         * @param {number} layerId - Layer ID to delete
+         */
+        function deleteLayer(layerId) {
+            const index = state.layers.findIndex(l => l.id === layerId);
+            if (index === -1) return;
+            
+            // Remove from DOM
+            const element = document.getElementById(`layer-${layerId}`);
+            if (element) {
+                element.remove();
+            }
+            
+            // Remove from state
+            state.layers.splice(index, 1);
+            
+            // Deselect if selected
+            if (state.selectedLayerId === layerId) {
+                deselectLayer();
+            }
+        }
+
+        /**
+         * Select a layer
+         * @param {number} layerId - Layer ID to select
+         */
+        function selectLayer(layerId) {
+            // Deselect previous
+            if (state.selectedLayerId !== null) {
+                const prevElement = document.getElementById(`layer-${state.selectedLayerId}`);
+                if (prevElement) {
+                    prevElement.classList.remove('selected');
+                }
+            }
+            
+            state.selectedLayerId = layerId;
+            
+            // Select new
+            const element = document.getElementById(`layer-${layerId}`);
+            if (element) {
+                element.classList.add('selected');
+            }
+            
+            // Update properties panel
+            updatePropertiesPanel();
+        }
+
+        /**
+         * Deselect current layer
+         */
+        function deselectLayer() {
+            if (state.selectedLayerId !== null) {
+                const element = document.getElementById(`layer-${state.selectedLayerId}`);
+                if (element) {
+                    element.classList.remove('selected');
+                    element.contentEditable = false;
+                    element.classList.remove('editing');
+                }
+            }
+            state.selectedLayerId = null;
+            updatePropertiesPanel();
+        }
+
+        /**
+         * Get currently selected layer
+         * @returns {object|null} Selected layer or null
+         */
+        function getSelectedLayer() {
+            if (state.selectedLayerId === null) return null;
+            return state.layers.find(l => l.id === state.selectedLayerId) || null;
+        }
+
+        // ============================================
+        // PROPERTIES PANEL
+        // ============================================
+        
+        /**
+         * Update properties panel with selected layer data
+         */
+        function updatePropertiesPanel() {
+            const layer = getSelectedLayer();
+            
+            if (!layer) {
+                elements.noSelectionMessage.style.display = 'block';
+                elements.layerProperties.style.display = 'none';
+                return;
+            }
+            
+            elements.noSelectionMessage.style.display = 'none';
+            elements.layerProperties.style.display = 'block';
+            
+            // Update all inputs
+            elements.propText.value = layer.text;
+            elements.propFontSize.value = layer.fontSize;
+            elements.fontSizeValue.textContent = `${layer.fontSize}px`;
+            elements.propFontWeight.value = layer.fontWeight;
+            elements.propFontFamily.value = layer.fontFamily;
+            elements.propColor.value = layer.color;
+            
+            // Alignment buttons
+            elements.alignButtons.forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.align === layer.textAlign);
+            });
+            
+            // Shadow
+            elements.propShadowEnabled.checked = layer.shadow.enabled;
+            elements.shadowControls.style.display = layer.shadow.enabled ? 'block' : 'none';
+            elements.propShadowColor.value = layer.shadow.color;
+            elements.propShadowX.value = layer.shadow.x;
+            elements.propShadowY.value = layer.shadow.y;
+            elements.propShadowBlur.value = layer.shadow.blur;
+            elements.shadowXValue.textContent = `${layer.shadow.x}px`;
+            elements.shadowYValue.textContent = `${layer.shadow.y}px`;
+            elements.shadowBlurValue.textContent = `${layer.shadow.blur}px`;
+            
+            // Position
+            elements.propPosX.value = Math.round(layer.x);
+            elements.propPosY.value = Math.round(layer.y);
+        }
+
+        // ============================================
+        // DRAG & DROP
+        // ============================================
+        
+        /**
+         * Handle mouse down on layer
+         * @param {MouseEvent} e - Mouse event
+         */
+        function handleLayerMouseDown(e) {
+            // Ignore if editing
+            if (e.target.contentEditable === 'true') return;
+            
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const layerId = parseInt(e.target.dataset.layerId);
+            selectLayer(layerId);
+            
+            const layer = getSelectedLayer();
+            if (!layer) return;
+            
+            state.isDragging = true;
+            state.dragStartX = e.clientX;
+            state.dragStartY = e.clientY;
+            state.dragLayerStartX = layer.x;
+            state.dragLayerStartY = layer.y;
+            
+            document.addEventListener('mousemove', handleMouseMove);
+            document.addEventListener('mouseup', handleMouseUp);
+        }
+
+        /**
+         * Handle mouse move for dragging
+         * @param {MouseEvent} e - Mouse event
+         */
+        function handleMouseMove(e) {
+            if (!state.isDragging || !state.selectedLayerId) return;
+            
+            const scale = getDisplayScale();
+            const deltaX = (e.clientX - state.dragStartX) / scale;
+            const deltaY = (e.clientY - state.dragStartY) / scale;
+            
+            const canvasHeight = calculateHeight(state.canvasWidth, state.aspectRatio);
+            
+            const newX = clamp(state.dragLayerStartX + deltaX, 0, state.canvasWidth - 50);
+            const newY = clamp(state.dragLayerStartY + deltaY, 0, canvasHeight - 20);
+            
+            updateLayer(state.selectedLayerId, { x: newX, y: newY });
+            
+            // Update position inputs
+            elements.propPosX.value = Math.round(newX);
+            elements.propPosY.value = Math.round(newY);
+        }
+
+        /**
+         * Handle mouse up - end dragging
+         */
+        function handleMouseUp() {
+            state.isDragging = false;
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+        }
+
+        // ============================================
+        // INLINE EDITING
+        // ============================================
+        
+        /**
+         * Handle double click to enable editing
+         * @param {MouseEvent} e - Mouse event
+         */
+        function handleLayerDoubleClick(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const element = e.target;
+            element.contentEditable = true;
+            element.classList.add('editing');
+            element.focus();
+            
+            // Select all text
+            const selection = window.getSelection();
+            const range = document.createRange();
+            range.selectNodeContents(element);
+            selection.removeAllRanges();
+            selection.addRange(range);
+        }
+
+        /**
+         * Handle blur - end editing
+         * @param {FocusEvent} e - Blur event
+         */
+        function handleLayerBlur(e) {
+            const element = e.target;
+            element.contentEditable = false;
+            element.classList.remove('editing');
+            
+            // Update layer text
+            const layerId = parseInt(element.dataset.layerId);
+            updateLayer(layerId, { text: element.textContent });
+            
+            // Update properties panel
+            if (state.selectedLayerId === layerId) {
+                elements.propText.value = element.textContent;
+            }
+        }
+
+        /**
+         * Handle input during editing
+         * @param {InputEvent} e - Input event
+         */
+        function handleLayerInput(e) {
+            const element = e.target;
+            const layerId = parseInt(element.dataset.layerId);
+            const layer = state.layers.find(l => l.id === layerId);
+            if (layer) {
+                layer.text = element.textContent;
+            }
+        }
+
+        /**
+         * Handle keydown during editing
+         * @param {KeyboardEvent} e - Keyboard event
+         */
+        function handleLayerKeyDown(e) {
+            if (e.key === 'Escape') {
+                e.target.blur();
+            }
+        }
+
+        // ============================================
+        // EXPORT FUNCTIONALITY
+        // ============================================
+        
+        /**
+         * Export canvas as PNG
+         */
+        async function exportToPNG() {
+            const width = parseInt(elements.designCanvas.dataset.actualWidth);
+            const height = parseInt(elements.designCanvas.dataset.actualHeight);
+            
+            // Create offscreen canvas
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            
+            // Draw background
+            if (state.backgroundImage) {
+                await drawBackground(ctx, width, height);
+            } else {
+                // Draw placeholder gradient
+                const gradient = ctx.createLinearGradient(0, 0, width, height);
+                gradient.addColorStop(0, '#3a3a4e');
+                gradient.addColorStop(1, '#2a2a3e');
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, 0, width, height);
+            }
+            
+            // Draw text layers
+            state.layers.forEach(layer => {
+                drawTextLayer(ctx, layer);
+            });
+            
+            // Download
+            const link = document.createElement('a');
+            link.download = `match-poster-${Date.now()}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        }
+
+        /**
+         * Draw background image on canvas context
+         * @param {CanvasRenderingContext2D} ctx - Canvas context
+         * @param {number} width - Canvas width
+         * @param {number} height - Canvas height
+         */
+        function drawBackground(ctx, width, height) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = () => {
+                    let sx = 0, sy = 0, sw = img.width, sh = img.height;
+                    let dx = 0, dy = 0, dw = width, dh = height;
+                    
+                    const imgRatio = img.width / img.height;
+                    const canvasRatio = width / height;
+                    
+                    if (state.backgroundSizeMode === 'cover') {
+                        if (imgRatio > canvasRatio) {
+                            sw = img.height * canvasRatio;
+                            sx = (img.width - sw) / 2;
+                        } else {
+                            sh = img.width / canvasRatio;
+                            sy = (img.height - sh) / 2;
+                        }
+                    } else { // contain
+                        if (imgRatio > canvasRatio) {
+                            dh = width / imgRatio;
+                            dy = (height - dh) / 2;
+                        } else {
+                            dw = height * imgRatio;
+                            dx = (width - dw) / 2;
+                        }
+                        // Fill background
+                        ctx.fillStyle = '#2a2a3e';
+                        ctx.fillRect(0, 0, width, height);
+                    }
+                    
+                    ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
+                    resolve();
+                };
+                img.src = state.backgroundImage;
+            });
+        }
+
+        /**
+         * Draw text layer on canvas context
+         * @param {CanvasRenderingContext2D} ctx - Canvas context
+         * @param {object} layer - Layer data
+         */
+        function drawTextLayer(ctx, layer) {
+            ctx.font = `${layer.fontWeight} ${layer.fontSize}px ${layer.fontFamily}`;
+            ctx.fillStyle = layer.color;
+            ctx.textAlign = layer.textAlign;
+            ctx.textBaseline = 'top';
+            
+            // Calculate x position based on alignment
+            let x = layer.x;
+            if (layer.textAlign === 'center') {
+                // Measure text width and adjust
+                const metrics = ctx.measureText(layer.text);
+                x = layer.x + metrics.width / 2;
+            } else if (layer.textAlign === 'right') {
+                const metrics = ctx.measureText(layer.text);
+                x = layer.x + metrics.width;
+            }
+            
+            // Apply shadow if enabled
+            if (layer.shadow.enabled) {
+                ctx.shadowColor = layer.shadow.color;
+                ctx.shadowOffsetX = layer.shadow.x;
+                ctx.shadowOffsetY = layer.shadow.y;
+                ctx.shadowBlur = layer.shadow.blur;
+            } else {
+                ctx.shadowColor = 'transparent';
+                ctx.shadowOffsetX = 0;
+                ctx.shadowOffsetY = 0;
+                ctx.shadowBlur = 0;
+            }
+            
+            // Handle multiline text
+            const lines = layer.text.split('\n');
+            let y = layer.y;
+            lines.forEach(line => {
+                ctx.fillText(line, x, y);
+                y += layer.fontSize * 1.2;
+            });
+        }
+
+        // ============================================
+        // EVENT HANDLERS
+        // ============================================
+        
+        /**
+         * Handle background image upload
+         * @param {Event} e - Change event
+         */
+        function handleBackgroundUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                setBackgroundImage(event.target.result);
+            };
+            reader.readAsDataURL(file);
+        }
+
+        /**
+         * Handle aspect ratio change
+         */
+        function handleAspectRatioChange() {
+            state.aspectRatio = elements.aspectRatio.value;
+            updateCanvasDimensions();
+        }
+
+        /**
+         * Handle canvas width change
+         */
+        function handleCanvasWidthChange() {
+            const value = parseInt(elements.canvasWidth.value);
+            if (isNaN(value) || value < 100 || value > 4000) return;
+            state.canvasWidth = value;
+            updateCanvasDimensions();
+        }
+
+        /**
+         * Handle background size mode change
+         */
+        function handleBgSizeModeChange() {
+            updateBackgroundSizeMode(elements.bgSizeMode.value);
+        }
+
+        /**
+         * Handle click on canvas area (deselect)
+         * @param {MouseEvent} e - Mouse event
+         */
+        function handleCanvasClick(e) {
+            if (e.target === elements.designCanvas) {
+                deselectLayer();
+            }
+        }
+
+        /**
+         * Handle keyboard shortcuts
+         * @param {KeyboardEvent} e - Keyboard event
+         */
+        function handleKeyDown(e) {
+            // Ignore if editing text
+            if (document.activeElement.contentEditable === 'true' ||
+                document.activeElement.tagName === 'INPUT' ||
+                document.activeElement.tagName === 'TEXTAREA' ||
+                document.activeElement.tagName === 'SELECT') {
+                return;
+            }
+            
+            // Delete selected layer
+            if ((e.key === 'Delete' || e.key === 'Backspace') && state.selectedLayerId) {
+                e.preventDefault();
+                deleteLayer(state.selectedLayerId);
+            }
+        }
+
+        /**
+         * Handle property text change
+         */
+        function handlePropTextChange() {
+            if (!state.selectedLayerId) return;
+            updateLayer(state.selectedLayerId, { text: elements.propText.value });
+        }
+
+        /**
+         * Handle font size change
+         */
+        function handleFontSizeChange() {
+            if (!state.selectedLayerId) return;
+            const size = parseInt(elements.propFontSize.value);
+            elements.fontSizeValue.textContent = `${size}px`;
+            updateLayer(state.selectedLayerId, { fontSize: size });
+        }
+
+        /**
+         * Handle font weight change
+         */
+        function handleFontWeightChange() {
+            if (!state.selectedLayerId) return;
+            updateLayer(state.selectedLayerId, { fontWeight: elements.propFontWeight.value });
+        }
+
+        /**
+         * Handle font family change
+         */
+        function handleFontFamilyChange() {
+            if (!state.selectedLayerId) return;
+            updateLayer(state.selectedLayerId, { fontFamily: elements.propFontFamily.value });
+        }
+
+        /**
+         * Handle color change
+         */
+        function handleColorChange() {
+            if (!state.selectedLayerId) return;
+            updateLayer(state.selectedLayerId, { color: elements.propColor.value });
+        }
+
+        /**
+         * Handle alignment button click
+         * @param {MouseEvent} e - Click event
+         */
+        function handleAlignmentClick(e) {
+            const btn = e.currentTarget;
+            const align = btn.dataset.align;
+            if (!state.selectedLayerId) return;
+            
+            updateLayer(state.selectedLayerId, { textAlign: align });
+            
+            // Update button states
+            elements.alignButtons.forEach(b => {
+                b.classList.toggle('active', b.dataset.align === align);
+            });
+        }
+
+        /**
+         * Handle shadow toggle
+         */
+        function handleShadowToggle() {
+            if (!state.selectedLayerId) return;
+            const layer = getSelectedLayer();
+            if (!layer) return;
+            
+            layer.shadow.enabled = elements.propShadowEnabled.checked;
+            elements.shadowControls.style.display = layer.shadow.enabled ? 'block' : 'none';
+            updateLayer(state.selectedLayerId, { shadow: layer.shadow });
+        }
+
+        /**
+         * Handle shadow color change
+         */
+        function handleShadowColorChange() {
+            if (!state.selectedLayerId) return;
+            const layer = getSelectedLayer();
+            if (!layer) return;
+            
+            layer.shadow.color = elements.propShadowColor.value;
+            updateLayer(state.selectedLayerId, { shadow: layer.shadow });
+        }
+
+        /**
+         * Handle shadow X change
+         */
+        function handleShadowXChange() {
+            if (!state.selectedLayerId) return;
+            const layer = getSelectedLayer();
+            if (!layer) return;
+            
+            layer.shadow.x = parseInt(elements.propShadowX.value);
+            elements.shadowXValue.textContent = `${layer.shadow.x}px`;
+            updateLayer(state.selectedLayerId, { shadow: layer.shadow });
+        }
+
+        /**
+         * Handle shadow Y change
+         */
+        function handleShadowYChange() {
+            if (!state.selectedLayerId) return;
+            const layer = getSelectedLayer();
+            if (!layer) return;
+            
+            layer.shadow.y = parseInt(elements.propShadowY.value);
+            elements.shadowYValue.textContent = `${layer.shadow.y}px`;
+            updateLayer(state.selectedLayerId, { shadow: layer.shadow });
+        }
+
+        /**
+         * Handle shadow blur change
+         */
+        function handleShadowBlurChange() {
+            if (!state.selectedLayerId) return;
+            const layer = getSelectedLayer();
+            if (!layer) return;
+            
+            layer.shadow.blur = parseInt(elements.propShadowBlur.value);
+            elements.shadowBlurValue.textContent = `${layer.shadow.blur}px`;
+            updateLayer(state.selectedLayerId, { shadow: layer.shadow });
+        }
+
+        /**
+         * Handle position X change
+         */
+        function handlePosXChange() {
+            if (!state.selectedLayerId) return;
+            const x = parseInt(elements.propPosX.value);
+            if (!isNaN(x)) {
+                updateLayer(state.selectedLayerId, { x: clamp(x, 0, state.canvasWidth - 50) });
+            }
+        }
+
+        /**
+         * Handle position Y change
+         */
+        function handlePosYChange() {
+            if (!state.selectedLayerId) return;
+            const y = parseInt(elements.propPosY.value);
+            const maxY = calculateHeight(state.canvasWidth, state.aspectRatio) - 20;
+            if (!isNaN(y)) {
+                updateLayer(state.selectedLayerId, { y: clamp(y, 0, maxY) });
+            }
+        }
+
+        /**
+         * Handle delete layer button
+         */
+        function handleDeleteLayer() {
+            if (state.selectedLayerId) {
+                deleteLayer(state.selectedLayerId);
+            }
+        }
+
+        /**
+         * Handle window resize
+         */
+        function handleResize() {
+            updateCanvasDimensions();
+        }
+
+        // ============================================
+        // INITIALIZATION
+        // ============================================
+        
+        /**
+         * Attach all event listeners
+         */
+        function attachEventListeners() {
+            // Toolbar
+            elements.bgUpload.addEventListener('change', handleBackgroundUpload);
+            elements.bgSizeMode.addEventListener('change', handleBgSizeModeChange);
+            elements.aspectRatio.addEventListener('change', handleAspectRatioChange);
+            elements.canvasWidth.addEventListener('change', handleCanvasWidthChange);
+            elements.addTextBtn.addEventListener('click', addTextLayer);
+            elements.exportBtn.addEventListener('click', exportToPNG);
+            
+            // Canvas
+            elements.designCanvas.addEventListener('click', handleCanvasClick);
+            
+            // Properties panel
+            elements.propText.addEventListener('input', handlePropTextChange);
+            elements.propFontSize.addEventListener('input', handleFontSizeChange);
+            elements.propFontWeight.addEventListener('change', handleFontWeightChange);
+            elements.propFontFamily.addEventListener('change', handleFontFamilyChange);
+            elements.propColor.addEventListener('input', handleColorChange);
+            elements.alignButtons.forEach(btn => {
+                btn.addEventListener('click', handleAlignmentClick);
+            });
+            elements.propShadowEnabled.addEventListener('change', handleShadowToggle);
+            elements.propShadowColor.addEventListener('input', handleShadowColorChange);
+            elements.propShadowX.addEventListener('input', handleShadowXChange);
+            elements.propShadowY.addEventListener('input', handleShadowYChange);
+            elements.propShadowBlur.addEventListener('input', handleShadowBlurChange);
+            elements.propPosX.addEventListener('change', handlePosXChange);
+            elements.propPosY.addEventListener('change', handlePosYChange);
+            elements.deleteLayerBtn.addEventListener('click', handleDeleteLayer);
+            
+            // Global
+            document.addEventListener('keydown', handleKeyDown);
+            window.addEventListener('resize', handleResize);
+        }
+
+        /**
+         * Initialize the application
+         */
+        function init() {
+            attachEventListeners();
+            updateBackgroundSizeMode('cover');
+            updateCanvasDimensions();
+            
+            // Add initial text layer
+            addTextLayer();
+        }
+
+        // Start the app when DOM is ready
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
