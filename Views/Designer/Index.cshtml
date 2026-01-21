@@ -129,18 +129,46 @@
         cursor: move;
         user-select: none;
         border: 2px solid transparent;
-        border-radius: 4px;
-        transition: border-color 0.15s ease;
+        border-radius: 50%;
+        transition: all 0.15s ease;
         z-index: 1;
         background-size: contain;
         background-repeat: no-repeat;
         background-position: center;
+        background-color: rgba(255, 255, 255, 0.1);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 4px 8px rgba(0, 0, 0, 0.3);
     }
 
     .image-layer:hover { border-color: rgba(255, 255, 255, 0.3); }
     .image-layer.selected {
         border-color: var(--selection-color);
-        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 0 2px rgba(59, 130, 246, 0.3);
+    }
+
+    .team-name-layer {
+        text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.8), 0 0 20px rgba(0, 0, 0, 0.5);
+    }
+
+    /* Hizalama kılavuz çizgileri */
+    .alignment-guide {
+        position: absolute;
+        background-color: #ff4081;
+        z-index: 1000;
+        pointer-events: none;
+        opacity: 0.8;
+    }
+    .alignment-guide.horizontal {
+        height: 1px;
+        left: 0;
+        right: 0;
+    }
+    .alignment-guide.vertical {
+        width: 1px;
+        top: 0;
+        bottom: 0;
+    }
+    .alignment-guide.center {
+        background-color: #00e676;
     }
 
     .properties-panel {
@@ -893,9 +921,16 @@
 
     // Image Layer Functions
     function createImageLayer(imageUrl, x, y, width = 120, height = 120) {
+        // External URL'leri proxy üzerinden yükle
+        let proxyUrl = imageUrl;
+        if (imageUrl && !imageUrl.startsWith('/') && !imageUrl.startsWith(window.location.origin)) {
+            proxyUrl = `/Designer/ImageProxy?url=${encodeURIComponent(imageUrl)}`;
+        }
+        
         const layer = {
             id: state.nextImageLayerId++,
-            imageUrl: imageUrl,
+            imageUrl: proxyUrl,
+            originalUrl: imageUrl,
             x: x,
             y: y,
             width: width,
@@ -945,8 +980,25 @@
         const layer = state.imageLayers.find(l => l.id === state.selectedImageLayerId);
         if (!layer) return;
         const h = calculateHeight(state.canvasWidth, state.aspectRatio);
-        const nx = clamp(state.dragLayerStartX + dx, 0, state.canvasWidth - layer.width);
-        const ny = clamp(state.dragLayerStartY + dy, 0, h - layer.height);
+        let nx = clamp(state.dragLayerStartX + dx, 0, state.canvasWidth - layer.width);
+        let ny = clamp(state.dragLayerStartY + dy, 0, h - layer.height);
+        
+        // Hizalama kontrolü
+        const currentBounds = getLayerBounds({ ...layer, x: nx, y: ny }, true);
+        const otherBounds = getAllOtherLayerBounds(layer.id, true);
+        const { guides, snaps } = checkAlignment(currentBounds, otherBounds);
+        
+        // Snap uygula
+        if (snaps.x !== null) nx += snaps.x;
+        if (snaps.y !== null) ny += snaps.y;
+        
+        // Çizgileri göster
+        if (guides.horizontal.length > 0 || guides.vertical.length > 0) {
+            showAlignmentGuides(guides);
+        } else {
+            clearAlignmentGuides();
+        }
+        
         layer.x = nx;
         layer.y = ny;
         const el = document.getElementById(`img-layer-${layer.id}`);
@@ -958,6 +1010,7 @@
 
     function handleImageMouseUp() {
         state.isDragging = false;
+        clearAlignmentGuides();
         document.removeEventListener('mousemove', handleImageMouseMove);
         document.removeEventListener('mouseup', handleImageMouseUp);
     }
@@ -993,6 +1046,135 @@
             state.selectedImageLayerId = null;
             updatePropertiesPanel();
         }
+    }
+
+    // Hizalama Çizgileri
+    const SNAP_THRESHOLD = 8; // Piksel cinsinden snap eşiği
+    
+    function getLayerBounds(layer, isImage = false) {
+        if (isImage) {
+            return {
+                left: layer.x,
+                right: layer.x + layer.width,
+                top: layer.y,
+                bottom: layer.y + layer.height,
+                centerX: layer.x + layer.width / 2,
+                centerY: layer.y + layer.height / 2,
+                width: layer.width,
+                height: layer.height
+            };
+        } else {
+            // Metin katmanları için tahmini boyut
+            const el = document.getElementById(`layer-${layer.id}`);
+            const scale = getDisplayScale();
+            let width = 100, height = layer.fontSize;
+            if (el) {
+                width = el.offsetWidth / scale;
+                height = el.offsetHeight / scale;
+            }
+            return {
+                left: layer.x,
+                right: layer.x + width,
+                top: layer.y,
+                bottom: layer.y + height,
+                centerX: layer.x + width / 2,
+                centerY: layer.y + height / 2,
+                width: width,
+                height: height
+            };
+        }
+    }
+
+    function getAllOtherLayerBounds(excludeId, excludeIsImage) {
+        const bounds = [];
+        const canvasH = calculateHeight(state.canvasWidth, state.aspectRatio);
+        
+        // Canvas merkez çizgileri
+        bounds.push({
+            centerX: state.canvasWidth / 2,
+            centerY: canvasH / 2,
+            isCenter: true
+        });
+        
+        // Diğer metin katmanları
+        state.layers.forEach(layer => {
+            if (!excludeIsImage && layer.id === excludeId) return;
+            bounds.push(getLayerBounds(layer, false));
+        });
+        
+        // Diğer resim katmanları
+        state.imageLayers.forEach(layer => {
+            if (excludeIsImage && layer.id === excludeId) return;
+            bounds.push(getLayerBounds(layer, true));
+        });
+        
+        return bounds;
+    }
+
+    function checkAlignment(currentBounds, otherBounds) {
+        const guides = { horizontal: [], vertical: [] };
+        const snaps = { x: null, y: null };
+        
+        otherBounds.forEach(other => {
+            // Yatay hizalama kontrolleri
+            // Üst kenar hizalama
+            if (Math.abs(currentBounds.top - other.top) < SNAP_THRESHOLD) {
+                guides.horizontal.push({ y: other.top, isCenter: false });
+                snaps.y = other.top - currentBounds.top;
+            }
+            // Alt kenar hizalama
+            if (other.bottom && Math.abs(currentBounds.bottom - other.bottom) < SNAP_THRESHOLD) {
+                guides.horizontal.push({ y: other.bottom, isCenter: false });
+                snaps.y = other.bottom - currentBounds.bottom;
+            }
+            // Merkez Y hizalama
+            if (other.centerY && Math.abs(currentBounds.centerY - other.centerY) < SNAP_THRESHOLD) {
+                guides.horizontal.push({ y: other.centerY, isCenter: other.isCenter });
+                snaps.y = other.centerY - currentBounds.centerY;
+            }
+            
+            // Dikey hizalama kontrolleri
+            // Sol kenar hizalama
+            if (Math.abs(currentBounds.left - other.left) < SNAP_THRESHOLD) {
+                guides.vertical.push({ x: other.left, isCenter: false });
+                snaps.x = other.left - currentBounds.left;
+            }
+            // Sağ kenar hizalama
+            if (other.right && Math.abs(currentBounds.right - other.right) < SNAP_THRESHOLD) {
+                guides.vertical.push({ x: other.right, isCenter: false });
+                snaps.x = other.right - currentBounds.right;
+            }
+            // Merkez X hizalama
+            if (other.centerX && Math.abs(currentBounds.centerX - other.centerX) < SNAP_THRESHOLD) {
+                guides.vertical.push({ x: other.centerX, isCenter: other.isCenter });
+                snaps.x = other.centerX - currentBounds.centerX;
+            }
+        });
+        
+        return { guides, snaps };
+    }
+
+    function showAlignmentGuides(guides) {
+        clearAlignmentGuides();
+        const scale = getDisplayScale();
+        
+        guides.horizontal.forEach(guide => {
+            const el = document.createElement('div');
+            el.className = 'alignment-guide horizontal' + (guide.isCenter ? ' center' : '');
+            el.style.top = `${guide.y * scale}px`;
+            elements.designCanvas.appendChild(el);
+        });
+        
+        guides.vertical.forEach(guide => {
+            const el = document.createElement('div');
+            el.className = 'alignment-guide vertical' + (guide.isCenter ? ' center' : '');
+            el.style.left = `${guide.x * scale}px`;
+            elements.designCanvas.appendChild(el);
+        });
+    }
+
+    function clearAlignmentGuides() {
+        elements.designCanvas.querySelectorAll('.alignment-guide').forEach(el => el.remove());
     }
 
     // Properties Panel
@@ -1049,8 +1231,28 @@
         const dx = (e.clientX - state.dragStartX) / scale;
         const dy = (e.clientY - state.dragStartY) / scale;
         const h = calculateHeight(state.canvasWidth, state.aspectRatio);
-        const nx = clamp(state.dragLayerStartX + dx, 0, state.canvasWidth - 50);
-        const ny = clamp(state.dragLayerStartY + dy, 0, h - 20);
+        let nx = clamp(state.dragLayerStartX + dx, 0, state.canvasWidth - 50);
+        let ny = clamp(state.dragLayerStartY + dy, 0, h - 20);
+        
+        // Hizalama kontrolü
+        const layer = getSelectedLayer();
+        if (layer) {
+            const currentBounds = getLayerBounds({ ...layer, x: nx, y: ny }, false);
+            const otherBounds = getAllOtherLayerBounds(layer.id, false);
+            const { guides, snaps } = checkAlignment(currentBounds, otherBounds);
+            
+            // Snap uygula
+            if (snaps.x !== null) nx += snaps.x;
+            if (snaps.y !== null) ny += snaps.y;
+            
+            // Çizgileri göster
+            if (guides.horizontal.length > 0 || guides.vertical.length > 0) {
+                showAlignmentGuides(guides);
+            } else {
+                clearAlignmentGuides();
+            }
+        }
+        
         updateLayer(state.selectedLayerId, { x: nx, y: ny });
         elements.propPosX.value = Math.round(nx);
         elements.propPosY.value = Math.round(ny);
@@ -1058,6 +1260,7 @@
 
     function handleMouseUp() {
         state.isDragging = false;
+        clearAlignmentGuides();
         document.removeEventListener('mousemove', handleMouseMove);
         document.removeEventListener('mouseup', handleMouseUp);
     }
@@ -1127,18 +1330,87 @@
 
     function drawImageLayer(ctx, layer) {
         return new Promise((resolve, reject) => {
-            const img = new Image();
-            img.crossOrigin = 'anonymous';
-            img.onload = () => {
-                ctx.drawImage(img, layer.x, layer.y, layer.width, layer.height);
+            // Önce görüntüyü bir img elementinden al
+            const existingEl = document.getElementById(`img-layer-${layer.id}`);
+            if (existingEl) {
+                // CSS background-image'dan URL'i al
+                const bgImage = existingEl.style.backgroundImage;
+                const urlMatch = bgImage.match(/url\(["']?(.+?)["']?\)/);
+                if (urlMatch && urlMatch[1]) {
+                    const imageUrl = urlMatch[1];
+                    
+                    // Yeni bir Image oluştur
+                    const img = new Image();
+                    img.crossOrigin = 'anonymous';
+                    
+                    img.onload = () => {
+                        // Yuvarlak çizim için clip kullan
+                        ctx.save();
+                        
+                        // Yuvarlak maske oluştur
+                        const centerX = layer.x + layer.width / 2;
+                        const centerY = layer.y + layer.height / 2;
+                        const radius = Math.min(layer.width, layer.height) / 2;
+                        
+                        ctx.beginPath();
+                        ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+                        ctx.closePath();
+                        ctx.clip();
+                        
+                        // Gölge ekle
+                        ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+                        ctx.shadowBlur = 20;
+                        ctx.shadowOffsetX = 0;
+                        ctx.shadowOffsetY = 8;
+                        
+                        // Arka plan çemberi
+                        ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+                        ctx.fill();
+                        
+                        // Resmi çiz
+                        ctx.shadowColor = 'transparent';
+                        ctx.drawImage(img, layer.x, layer.y, layer.width, layer.height);
+                        
+                        ctx.restore();
+                        resolve();
+                    };
+                    
+                    img.onerror = () => {
+                        console.warn('Image could not be loaded:', imageUrl);
+                        // Fallback: Resim yüklenemezse placeholder çiz
+                        drawImagePlaceholder(ctx, layer);
+                        resolve();
+                    };
+                    
+                    // CORS için proxy kullanmayı dene, başarısız olursa doğrudan yükle
+                    img.src = imageUrl;
+                } else {
+                    resolve();
+                }
+            } else {
                 resolve();
-            };
-            img.onerror = () => {
-                console.warn('Image could not be loaded:', layer.imageUrl);
-                resolve(); // Continue even if image fails
-            };
-            img.src = layer.imageUrl;
+            }
         });
+    }
+
+    // Resim yüklenemezse placeholder çiz
+    function drawImagePlaceholder(ctx, layer) {
+        ctx.save();
+        const centerX = layer.x + layer.width / 2;
+        const centerY = layer.y + layer.height / 2;
+        const radius = Math.min(layer.width, layer.height) / 2;
+        
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+        ctx.closePath();
+        
+        ctx.fillStyle = 'rgba(100, 100, 100, 0.5)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        
+        ctx.restore();
     }
 
     function drawBackground(ctx, width, height) {
@@ -1355,46 +1627,53 @@
         const canvasH = calculateHeight(canvasW, state.aspectRatio);
         const centerY = canvasH / 2;
         
-        // Logo boyutları
-        const logoSize = 120;
-        const spacing = 80;
-        const textOffset = 60;
+        // Logo boyutları - daha büyük ve şık
+        const logoSize = 150;
+        const spacing = 100;
         
-        // Sol takım logosu (sol tarafta)
+        // Sol takım logosu (sol tarafta) - yuvarlak ve gölgeli
         if (team1Image) {
-            createImageLayer(team1Image, canvasW / 2 - logoSize - spacing - logoSize / 2, centerY - logoSize / 2, logoSize, logoSize);
+            createImageLayer(team1Image, canvasW / 2 - spacing - logoSize, centerY - logoSize / 2 - 30, logoSize, logoSize);
         }
         
-        // Sağ takım logosu (sağ tarafta)
+        // Sağ takım logosu (sağ tarafta) - yuvarlak ve gölgeli
         if (team2Image) {
-            createImageLayer(team2Image, canvasW / 2 + spacing + logoSize / 2, centerY - logoSize / 2, logoSize, logoSize);
+            createImageLayer(team2Image, canvasW / 2 + spacing, centerY - logoSize / 2 - 30, logoSize, logoSize);
         }
         
-        // Sol takım adı (logonun altında)
+        // Sol takım adı (logonun altında) - gölgeli
         const team1Layer = createDefaultLayerProps(team1Name);
-        team1Layer.x = canvasW / 2 - spacing - logoSize - 50;
-        team1Layer.y = centerY + logoSize / 2 + 20;
-        team1Layer.fontSize = 32;
+        team1Layer.x = canvasW / 2 - spacing - logoSize / 2 - 75;
+        team1Layer.y = centerY + logoSize / 2;
+        team1Layer.fontSize = 28;
+        team1Layer.fontWeight = '700';
         team1Layer.textAlign = 'center';
+        team1Layer.shadow = { enabled: true, color: '#000000', x: 2, y: 2, blur: 8 };
+        team1Layer.isTeamName = true;
         state.layers.push(team1Layer);
         renderLayer(team1Layer);
         
-        // VS metni (ortada)
+        // VS metni (ortada) - büyük ve şık
         const vsLayer = createDefaultLayerProps('VS');
-        vsLayer.x = canvasW / 2 - 30;
-        vsLayer.y = centerY - 30;
-        vsLayer.fontSize = 64;
+        vsLayer.x = canvasW / 2 - 40;
+        vsLayer.y = centerY - 40;
+        vsLayer.fontSize = 72;
         vsLayer.fontWeight = '900';
         vsLayer.textAlign = 'center';
+        vsLayer.color = '#00d4ff';
+        vsLayer.shadow = { enabled: true, color: '#000000', x: 3, y: 3, blur: 12 };
         state.layers.push(vsLayer);
         renderLayer(vsLayer);
         
-        // Sağ takım adı (logonun altında)
+        // Sağ takım adı (logonun altında) - gölgeli
         const team2Layer = createDefaultLayerProps(team2Name);
-        team2Layer.x = canvasW / 2 + spacing + logoSize / 2;
-        team2Layer.y = centerY + logoSize / 2 + 20;
-        team2Layer.fontSize = 32;
+        team2Layer.x = canvasW / 2 + spacing + logoSize / 2 - 75;
+        team2Layer.y = centerY + logoSize / 2;
+        team2Layer.fontSize = 28;
+        team2Layer.fontWeight = '700';
         team2Layer.textAlign = 'center';
+        team2Layer.shadow = { enabled: true, color: '#000000', x: 2, y: 2, blur: 8 };
+        team2Layer.isTeamName = true;
         state.layers.push(team2Layer);
         renderLayer(team2Layer);
     }
@@ -1536,6 +1815,9 @@
         attachEventListeners();
         updateBackgroundSizeMode('cover');
         updateCanvasDimensions();
+        // Default arkaplan resmi
+        setBackgroundImage('/images/defaultbgpanaroma.png');
+        // Varsayılan metin ekleme
         addTextLayer('Maç Posteri');
     }
 

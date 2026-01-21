@@ -29,7 +29,12 @@ public class RakipbulApiManager
         var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
 
         var response = await client.PostAsync(_settings.TokenEndpoint, content);
-        response.EnsureSuccessStatusCode();
+        
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorContent = await response.Content.ReadAsStringAsync();
+            throw new HttpRequestException($"Token alınamadı. Status: {response.StatusCode}, Endpoint: {_settings.TokenEndpoint}, Response: {errorContent}");
+        }
 
         var json = await response.Content.ReadAsStringAsync();
 
