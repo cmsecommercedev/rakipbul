@@ -20,12 +20,14 @@ namespace RakipBul.Controllers.Api // Namespace'i kontrol edin
         private readonly ApplicationDbContext _context;
         private readonly ILogger<ContextController> _logger;
         private readonly IMemoryCache _cache;
+        private readonly CloudflareR2Manager _r2Manager;
 
-        public ContextController(ApplicationDbContext context, ILogger<ContextController> logger, IMemoryCache cache)
+        public ContextController(ApplicationDbContext context, ILogger<ContextController> logger, IMemoryCache cache, CloudflareR2Manager r2Manager)
         {
             _context = context;
             _logger = logger;
             _cache = cache;
+            _r2Manager = r2Manager;
         }
 
         // GET: /api/news/list?culture=tr
@@ -575,6 +577,207 @@ namespace RakipBul.Controllers.Api // Namespace'i kontrol edin
 
             return Ok(result);
         }
+
+        #region TeamSquadImage Endpoints
+
+        /// <summary>
+        /// Takım kadro görsellerini listeler
+        /// </summary>
+        [HttpGet("team-squad-images")]
+        public async Task<IActionResult> GetTeamSquadImages([FromQuery] int? teamId = null)
+        {
+            var query = _context.TeamSquadImages.AsNoTracking();
+
+            if (teamId.HasValue)
+                query = query.Where(x => x.TeamId == teamId.Value);
+
+            var images = await query
+                .OrderByDescending(x => x.CreatedAt)
+                .Select(x => new
+                {
+                    x.Id,
+                    x.TeamId,
+                    x.ImageUrl,
+                    x.CreatedAt
+                })
+                .ToListAsync();
+
+            return Ok(images);
+        }
+
+        /// <summary>
+        /// Tek bir takım kadro görselini getirir
+        /// </summary>
+        [HttpGet("team-squad-images/{id}")]
+        public async Task<IActionResult> GetTeamSquadImage(int id)
+        {
+            var image = await _context.TeamSquadImages
+                .AsNoTracking()
+                .Where(x => x.Id == id)
+                .Select(x => new
+                {
+                    x.Id,
+                    x.TeamId,
+                    x.ImageUrl,
+                    x.CreatedAt
+                })
+                .FirstOrDefaultAsync();
+
+            if (image == null)
+                return NotFound(new { message = "Görsel bulunamadı." });
+
+            return Ok(image);
+        }
+
+        /// <summary>
+        /// Yeni takım kadro görseli yükler (aynı TeamId varsa üzerine yazar)
+        /// </summary>
+        [HttpPost("team-squad-images")]
+        public async Task<IActionResult> UploadTeamSquadImage([FromForm] TeamSquadImageUploadDto dto)
+        {
+            if (dto.Image == null || dto.Image.Length == 0)
+                return BadRequest(new { message = "Görsel dosyası gereklidir." });
+
+            if (dto.TeamId <= 0)
+                return BadRequest(new { message = "Geçerli bir TeamId gereklidir." });
+
+            // Dosya uzantısını kontrol et
+            var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".webp", ".gif" };
+            var extension = Path.GetExtension(dto.Image.FileName).ToLowerInvariant();
+            if (!allowedExtensions.Contains(extension))
+                return BadRequest(new { message = "Geçersiz dosya formatı. İzin verilen formatlar: jpg, jpeg, png, webp, gif" });
+
+            try
+            {
+                // Bu takımın mevcut görseli var mı?
+                var existingImage = await _context.TeamSquadImages
+                    .FirstOrDefaultAsync(x => x.TeamId == dto.TeamId);
+
+                if (existingImage != null)
+                {
+                    // Eski görseli R2'den sil
+                    if (!string.IsNullOrWhiteSpace(existingImage.ImageKey))
+                    {
+                        try
+                        {
+                            await _r2Manager.DeleteFileAsync(existingImage.ImageKey);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Eski görsel silinirken hata oluştu: {ImageKey}", existingImage.ImageKey);
+                        }
+                    }
+
+                    // Yeni görseli yükle
+                    var fileName = $"squad-images/{dto.TeamId}/{Guid.NewGuid()}{extension}";
+                    using var stream = dto.Image.OpenReadStream();
+                    await _r2Manager.UploadFileAsync(fileName, stream, dto.Image.ContentType);
+
+                    // Mevcut kaydı güncelle
+                    existingImage.ImageKey = fileName;
+                    existingImage.ImageUrl = _r2Manager.GetFileUrl(fileName);
+                    existingImage.CreatedAt = DateTime.UtcNow;
+
+                    await _context.SaveChangesAsync();
+
+                    return Ok(new
+                    {
+                        existingImage.Id,
+                        existingImage.TeamId,
+                        existingImage.ImageUrl,
+                        message = "Görsel başarıyla güncellendi."
+                    });
+                }
+                else
+                {
+                    // Yeni görsel oluştur
+                    var fileName = $"squad-images/{dto.TeamId}/{Guid.NewGuid()}{extension}";
+                    using var stream = dto.Image.OpenReadStream();
+                    await _r2Manager.UploadFileAsync(fileName, stream, dto.Image.ContentType);
+
+                    var imageUrl = _r2Manager.GetFileUrl(fileName);
+
+                    var squadImage = new TeamSquadImage
+                    {
+                        TeamId = dto.TeamId,
+                        ImageKey = fileName,
+                        ImageUrl = imageUrl,
+                        CreatedAt = DateTime.UtcNow
+                    };
+
+                    _context.TeamSquadImages.Add(squadImage);
+                    await _context.SaveChangesAsync();
+
+                    return Ok(new
+                    {
+                        squadImage.Id,
+                        squadImage.TeamId,
+                        squadImage.ImageUrl,
+                        message = "Görsel başarıyla yüklendi."
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Takım kadro görseli yüklenirken hata oluştu.");
+                return StatusCode(500, new { message = "Görsel yüklenirken bir hata oluştu." });
+            }
+        }
+
+        /// <summary>
+        /// Takım kadro görselini siler
+        /// </summary>
+        [HttpDelete("team-squad-images/{id}")]
+        public async Task<IActionResult> DeleteTeamSquadImage(int id)
+        {
+            var image = await _context.TeamSquadImages.FindAsync(id);
+            if (image == null)
+                return NotFound(new { message = "Görsel bulunamadı." });
+
+            // R2'den görseli sil
+            if (!string.IsNullOrWhiteSpace(image.ImageKey))
+            {
+                try
+                {
+                    await _r2Manager.DeleteFileAsync(image.ImageKey);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Görsel R2'den silinirken hata oluştu.");
+                }
+            }
+
+            _context.TeamSquadImages.Remove(image);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Görsel başarıyla silindi." });
+        }
+
+        /// <summary>
+        /// Bir takımın kadro görselini getirir
+        /// </summary>
+        [HttpGet("team-squad-images/by-team/{teamId}")]
+        public async Task<IActionResult> GetTeamSquadImageByTeam(int teamId)
+        {
+            var image = await _context.TeamSquadImages
+                .AsNoTracking()
+                .Where(x => x.TeamId == teamId)
+                .Select(x => new
+                {
+                    x.Id,
+                    x.TeamId,
+                    x.ImageUrl,
+                    x.CreatedAt
+                })
+                .FirstOrDefaultAsync();
+
+            if (image == null)
+                return NotFound(new { message = "Bu takıma ait görsel bulunamadı." });
+
+            return Ok(image);
+        }
+
+        #endregion
 
     }
 }

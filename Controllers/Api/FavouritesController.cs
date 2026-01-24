@@ -222,5 +222,88 @@ namespace RakipBul.Controllers.Api // Namespace'i kontrol edin
             return Ok(new { isFavourite = isFav });
         }
 
+        /// <summary>
+        /// Kullanıcının favori takımlarını listeler
+        /// </summary>
+        [HttpGet("my-favourite-teams")]
+        public async Task<IActionResult> GetMyFavouriteTeams([FromQuery] string macId)
+        {
+            if (string.IsNullOrWhiteSpace(macId))
+                return BadRequest("Geçersiz cihaz bilgisi.");
+
+            var favouriteTeams = await _context.FavouriteTeams
+                .AsNoTracking()
+                .Where(f => f.MacID == macId)
+                .Select(f => new
+                {
+                    f.FavouriteTeamID,
+                    f.TeamID,
+                    f.UserToken
+                })
+                .ToListAsync();
+
+            return Ok(new { success = true, count = favouriteTeams.Count, teams = favouriteTeams });
+        }
+
+        /// <summary>
+        /// Kullanıcının favori oyuncularını listeler
+        /// </summary>
+        [HttpGet("my-favourite-players")]
+        public async Task<IActionResult> GetMyFavouritePlayers([FromQuery] string macId)
+        {
+            if (string.IsNullOrWhiteSpace(macId))
+                return BadRequest("Geçersiz cihaz bilgisi.");
+
+            var favouritePlayers = await _context.FavouritePlayers
+                .AsNoTracking()
+                .Where(f => f.MacID == macId)
+                .Select(f => new
+                {
+                    f.FavouritePlayerID,
+                    f.PlayerID,
+                    f.UserToken
+                })
+                .ToListAsync();
+
+            return Ok(new { success = true, count = favouritePlayers.Count, players = favouritePlayers });
+        }
+
+        /// <summary>
+        /// Kullanıcının tüm favorilerini listeler (takımlar ve oyuncular)
+        /// </summary>
+        [HttpGet("my-favourites")]
+        public async Task<IActionResult> GetMyFavourites([FromQuery] string macId)
+        {
+            if (string.IsNullOrWhiteSpace(macId))
+                return BadRequest("Geçersiz cihaz bilgisi.");
+
+            var favouriteTeams = await _context.FavouriteTeams
+                .AsNoTracking()
+                .Where(f => f.MacID == macId)
+                .Select(f => new
+                {
+                    f.FavouriteTeamID,
+                    f.TeamID
+                })
+                .ToListAsync();
+
+            var favouritePlayers = await _context.FavouritePlayers
+                .AsNoTracking()
+                .Where(f => f.MacID == macId)
+                .Select(f => new
+                {
+                    f.FavouritePlayerID,
+                    f.PlayerID
+                })
+                .ToListAsync();
+
+            return Ok(new
+            {
+                success = true,
+                teams = new { count = favouriteTeams.Count, items = favouriteTeams },
+                players = new { count = favouritePlayers.Count, items = favouritePlayers }
+            });
+        }
+
     }
 }

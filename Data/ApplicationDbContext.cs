@@ -53,6 +53,7 @@ namespace RakipBul.Data
         public DbSet<UserDeviceToken> UserDeviceToken { get; set; }
 
         public DbSet<DeviceTopicSubscription> DeviceTopicSubscriptions { get; set; }
+        public DbSet<TeamSquadImage> TeamSquadImages { get; set; }
 
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
