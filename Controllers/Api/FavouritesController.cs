@@ -83,31 +83,52 @@ namespace RakipBul.Controllers.Api // Namespace'i kontrol edin
         } 
 
         [HttpPost("addteamtofav")]
-        public async Task<IActionResult> AddTeamToFav(int teamId, string userToken, string MacID)
+        public async Task<IActionResult> AddTeamToFav(int teamId, string userToken, string MacID, string? teamName = null, string? teamImageUrl = null)
         {
             if (teamId <= 0 || string.IsNullOrWhiteSpace(userToken))
                 return BadRequest("Geçersiz veri.");
 
-            bool exists = await _context.FavouriteTeams
-                .AnyAsync(f => f.TeamID == teamId && f.UserToken == userToken);
+            var existing = await _context.FavouriteTeams
+                .FirstOrDefaultAsync(f => f.TeamID == teamId && f.MacID == MacID);
 
-            if (exists)
-                return Ok(new { success = true, message = "Zaten favorilerde." });
+            if (existing != null)
+            {
+                // Güncelle (isim/görsel değişmiş olabilir)
+                existing.TeamName = teamName;
+                existing.TeamImageUrl = teamImageUrl;
+                await _context.SaveChangesAsync();
+                
+                return Ok(new { 
+                    success = true, 
+                    message = "Zaten favorilerde, bilgiler güncellendi.",
+                    teamId = existing.TeamID,
+                    teamName = existing.TeamName,
+                    teamImageUrl = existing.TeamImageUrl
+                });
+            }
 
-            _context.FavouriteTeams.Add(new FavouriteTeams
+            var fav = new FavouriteTeams
             {
                 TeamID = teamId,
+                TeamName = teamName,
+                TeamImageUrl = teamImageUrl,
                 UserToken = userToken,
                 MacID = MacID
-            });
-
+            };
+            
+            _context.FavouriteTeams.Add(fav);
             await _context.SaveChangesAsync();
 
             string topic = $"team_{teamId}";
-
             await _notificationManager.SubscribeToTopicAsync(userToken, topic);
 
-            return Ok(new { success = true, message = "Favorilere eklendi." });
+            return Ok(new { 
+                success = true, 
+                message = "Favorilere eklendi.",
+                teamId = fav.TeamID,
+                teamName = fav.TeamName,
+                teamImageUrl = fav.TeamImageUrl
+            });
         }
 
 
@@ -142,34 +163,61 @@ namespace RakipBul.Controllers.Api // Namespace'i kontrol edin
         }
 
         [HttpPost("addplayertofav")]
-        public async Task<IActionResult> AddPlayerToFav([FromQuery] int playerId, [FromQuery] string userToken, string MacID)
+        public async Task<IActionResult> AddPlayerToFav([FromQuery] int playerId, [FromQuery] string userToken, string MacID, string? playerName = null, string? playerImageUrl = null)
         {
-            // Zaten favori mi kontrol et
-            bool alreadyExists = await _context.FavouritePlayers
-                .AnyAsync(f => f.PlayerID == playerId && f.UserToken == userToken);
+            if (playerId <= 0 || string.IsNullOrWhiteSpace(userToken))
+                return BadRequest("Geçersiz veri.");
 
-            if (alreadyExists)
-                return Ok(new { success = true, message = "Bu oyuncu zaten favorilerde." });
+            var existing = await _context.FavouritePlayers
+                .FirstOrDefaultAsync(f => f.PlayerID == playerId && f.MacID == MacID);
 
-            // Tabloya ekle
+            if (existing != null)
+            {
+                // Güncelle (isim/görsel değişmiş olabilir)
+                existing.PlayerName = playerName;
+                existing.PlayerImageUrl = playerImageUrl;
+                await _context.SaveChangesAsync();
+                
+                return Ok(new { 
+                    success = true, 
+                    message = "Zaten favorilerde, bilgiler güncellendi.",
+                    playerId = existing.PlayerID,
+                    playerName = existing.PlayerName,
+                    playerImageUrl = existing.PlayerImageUrl
+                });
+            }
+
             var fav = new FavouritePlayers
             {
                 PlayerID = playerId,
+                PlayerName = playerName,
+                PlayerImageUrl = playerImageUrl,
                 UserToken = userToken,
                 MacID = MacID
             };
+            
             _context.FavouritePlayers.Add(fav);
             await _context.SaveChangesAsync();
 
-            // Firebase topic abone et
             string topic = $"player_{playerId}";
-
             var result = await _notificationManager.SubscribeToTopicAsync(userToken, topic);
 
             if (result.success)
-                return Ok(new { success = true, message = $"Oyuncu favorilere eklendi ve topic'e abone olundu: {topic}" });
+                return Ok(new { 
+                    success = true, 
+                    message = $"Oyuncu favorilere eklendi ve topic'e abone olundu: {topic}",
+                    playerId = fav.PlayerID,
+                    playerName = fav.PlayerName,
+                    playerImageUrl = fav.PlayerImageUrl
+                });
             else
-                return StatusCode(500, new { success = false, message = $"Favorilere eklendi fakat topic abonesi yapılamadı: {result.message}" });
+                return StatusCode(500, new { 
+                    success = false, 
+                    message = $"Favorilere eklendi fakat topic abonesi yapılamadı: {result.message}",
+                    playerId = fav.PlayerID,
+                    playerName = fav.PlayerName,
+                    playerImageUrl = fav.PlayerImageUrl
+                });
         }
 
         [HttpPost("removeplayerfromfav")]
@@ -238,7 +286,8 @@ namespace RakipBul.Controllers.Api // Namespace'i kontrol edin
                 {
                     f.FavouriteTeamID,
                     f.TeamID,
-                    f.UserToken
+                    f.TeamName,
+                    f.TeamImageUrl
                 })
                 .ToListAsync();
 
@@ -261,7 +310,8 @@ namespace RakipBul.Controllers.Api // Namespace'i kontrol edin
                 {
                     f.FavouritePlayerID,
                     f.PlayerID,
-                    f.UserToken
+                    f.PlayerName,
+                    f.PlayerImageUrl
                 })
                 .ToListAsync();
 
@@ -283,7 +333,9 @@ namespace RakipBul.Controllers.Api // Namespace'i kontrol edin
                 .Select(f => new
                 {
                     f.FavouriteTeamID,
-                    f.TeamID
+                    f.TeamID,
+                    f.TeamName,
+                    f.TeamImageUrl
                 })
                 .ToListAsync();
 
@@ -293,7 +345,9 @@ namespace RakipBul.Controllers.Api // Namespace'i kontrol edin
                 .Select(f => new
                 {
                     f.FavouritePlayerID,
-                    f.PlayerID
+                    f.PlayerID,
+                    f.PlayerName,
+                    f.PlayerImageUrl
                 })
                 .ToListAsync();
 
